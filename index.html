@@ -225,7 +225,6 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
       <button role="tab" data-mode="login">Log in</button>
       <button role="tab" data-mode="signup">Sign up</button>
       <button role="tab" data-mode="claim" id="claimTab">No login yet</button>
-      <button role="tab" data-mode="admin">🔒 Admin</button>
     </div>
     <form class="auth" data-panel-mode="login" id="loginForm">
       <input id="liUser" placeholder="Username (the nickname you log in with)" autocomplete="username" autocapitalize="none" aria-label="Username">
@@ -256,6 +255,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
       <p class="note" style="margin:-4px 0 0">Your <b>password</b> is your secret, at least 4 characters. Don't tell anyone, and remember it!</p>
       <button class="primary" type="submit">Set up my login</button>
     </form>
+    <button type="button" id="adminTabBtn" class="ghost" style="align-self:center">🔒 Admin</button>
   </div>
 </div>
 
@@ -678,8 +678,10 @@ function setMode(m){
   authMode = m;
   document.querySelectorAll(".seg [data-mode]").forEach(b => b.setAttribute("aria-selected", b.dataset.mode === m));
   document.querySelectorAll("[data-panel-mode]").forEach(f => f.hidden = f.dataset.panelMode !== m);
+  if($("adminTabBtn")) $("adminTabBtn").hidden = m === "admin";
 }
 document.querySelectorAll(".seg [data-mode]").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+$("adminTabBtn").onclick = () => { setMode("admin"); setTimeout(() => $("adUser").focus(), 30); };
 setMode("login");
 function loggedIn(j, msg){ if(!j) return; document.querySelectorAll(".auth input").forEach(i => i.value = ""); window.scrollTo(0,0); toast(msg); }
 $("loginForm").onsubmit = async e => { e.preventDefault();
