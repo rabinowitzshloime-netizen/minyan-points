@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#16306e">
+<title>Minyan Points</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Frank+Ruhl+Libre:wght@500;700;900&family=Rubik:wght@400;500;700&display=swap">
+<style>
+html{height:100%}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+
+/* Layout: one column "board" — your points up top, ways to earn, lein sign-up, then the leaderboard. Single dark look by design. */
+:root{
+  --black:#05070d;
+  --navy:#102456;
+  --navy-2:#132654;
+  --line:#2a4a92;
+  --ice:#7fd4ff;
+  --ice-soft:#bfe9ff;
+  --text:#e6eeff;
+  --muted:#8ea3cf;
+  --good:#5fe3a1;
+  --display:"Caveat Brush", "Comic Sans MS", cursive;
+  --hebrew:"Frank Ruhl Libre", Georgia, serif;
+  --body:"Rubik", system-ui, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--black);color:var(--text)}
+body{font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left,0px));
+  padding-right:max(16px, env(safe-area-inset-right,0px));
+  padding-block:24px 48px;
+  background:radial-gradient(1200px 500px at 50% -200px, var(--navy-2), transparent 70%), var(--black);
+  min-height:100%;
+}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:900;font-size:clamp(30px,7vw,44px);line-height:1;margin:0;letter-spacing:-.01em}
+h1 span{color:var(--ice)}
+.heb{font-family:var(--display);color:var(--muted);font-size:18px;direction:rtl}
+h2{font-family:var(--display);font-weight:700;font-size:22px;margin:0;text-wrap:balance}
+.label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+section{background:var(--navy);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.me{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+select,input{font:inherit;color:var(--text);background:var(--black);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+.grow{flex:1 1 180px}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--navy-2);color:var(--text);padding:10px 14px;transition:background .15s,border-color .15s,transform .1s}
+button:hover{border-color:var(--ice)}
+button:active{transform:scale(.97)}
+button.primary{background:var(--ice);color:var(--black);border-color:var(--ice);font-weight:700}
+button.primary:hover{background:var(--ice-soft)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.score{display:flex;align-items:baseline;gap:10px}
+.big{font-family:var(--display);font-weight:900;font-size:64px;line-height:1;color:var(--ice);font-variant-numeric:tabular-nums}
+.earn{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.earn button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:12px 14px}
+.earn b{font-weight:500}
+.pts{color:var(--ice);font-size:13px;font-variant-numeric:tabular-nums}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.part{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;padding:10px 12px}
+.part .heb{font-size:15px;color:var(--ice-soft)}
+.part.taken{opacity:.55}
+.part.taken small{color:var(--muted)}
+.part.mine{border-color:var(--ice)}
+.part.done{border-color:var(--good)}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.board li{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--black);border:1px solid transparent}
+.board li.you{border-color:var(--ice)}
+.board .rank{font-family:var(--display);font-weight:900;color:var(--muted);font-variant-numeric:tabular-nums}
+.board li:first-child .rank{color:var(--ice)}
+.board .n{min-width:0;overflow-wrap:anywhere}
+.board .p{font-variant-numeric:tabular-nums;font-weight:700}
+.mylein li{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-radius:10px;background:var(--black)}
+.chip{font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.chip.done{color:var(--good);border-color:var(--good)}
+.empty{color:var(--muted);font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ice);color:var(--black);font-weight:700;padding:10px 16px;border-radius:99px;box-shadow:0 8px 30px rgba(0,0,0,.5);max-width:calc(100% - 32px)}
+.note{font-size:12px;color:var(--muted)}
+section.admin{border-color:var(--ice);background:linear-gradient(180deg,var(--navy-2),var(--navy))}
+.admin-chip{color:var(--ice);border-color:var(--ice)}
+.earn .info{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:10px;background:var(--black);border:1px solid var(--line)}
+.top-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.welcome{min-height:calc(100vh - 72px);display:grid;place-items:center}
+.welcome-card{width:100%;max-width:400px;display:flex;flex-direction:column;gap:14px;background:var(--navy);border:1px solid var(--ice);border-radius:18px;padding:24px;box-shadow:0 0 60px rgba(127,212,255,.12)}
+.welcome-card .heb{font-size:22px;color:var(--ice-soft)}
+.welcome-card input{font-size:17px;padding:14px}
+.welcome-card .primary{padding:14px;font-size:16px}
+.rules{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px;counter-reset:r}
+.rules li{counter-increment:r;display:grid;grid-template-columns:32px 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-radius:10px;background:var(--black);border:1px solid var(--line)}
+.rules li::before{content:counter(r);font-family:var(--display);font-weight:900;font-size:22px;color:var(--ice);text-align:center}
+.rules b{font-weight:500;display:block}
+.rules small{color:var(--muted)}
+.rules .pts{white-space:nowrap;font-weight:700}
+.prize{display:flex;flex-direction:column;gap:8px;color:var(--muted);font-size:14px}
+.prize .bar{height:10px;border-radius:99px;background:var(--black);border:1px solid var(--line);overflow:hidden}
+.prize .bar span{display:block;height:100%;background:var(--ice);border-radius:99px;transition:width .4s}
+.prize.won{color:var(--ice-soft);font-weight:700}
+.extra{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;color:var(--text)}
+.extra b{font-weight:500}
+button.ghost{background:transparent;color:var(--muted);font-size:13px;padding:6px 12px}
+
+/* ---------- Painted look ---------- */
+#paint{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.wrap,.welcome{position:relative;z-index:1}
+.toast{z-index:5}
+.heb{font-family:var(--hebrew)}
+h1{font-weight:400;font-size:clamp(40px,10vw,60px);letter-spacing:0;transform:rotate(-1.5deg)}
+h1 span{position:relative;display:inline-block;color:var(--black);padding:0 .22em;margin-left:.08em;isolation:isolate}
+h1 span::before{content:"";position:absolute;inset:.08em -.05em .02em;background:var(--ice);border-radius:40% 12% 35% 15%/50% 30% 60% 40%;filter:url(#rough);z-index:-1;transform:rotate(1.5deg)}
+h2{font-weight:400;font-size:28px;line-height:1.1}
+.big{font-weight:400;font-size:80px;text-shadow:3px 3px 0 var(--navy-2)}
+.rules li::before,.board .rank{font-weight:400;font-size:26px}
+section,.welcome-card{position:relative;isolation:isolate;background:transparent;border:0;border-radius:0}
+section::before,.welcome-card::before{content:"";position:absolute;inset:0;z-index:-1;
+  background:
+    repeating-linear-gradient(-8deg, rgba(127,212,255,.035) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(4deg, rgba(0,0,0,.18) 0 1px, transparent 1px 13px),
+    var(--navy);
+  border-radius:18px 6px 22px 8px;
+  box-shadow:inset 0 0 0 2px var(--line), 0 6px 24px rgba(5,10,30,.35);
+  filter:url(#rough)}
+section.admin::before,.welcome-card::before{box-shadow:inset 0 0 0 2px var(--ice), 0 6px 24px rgba(5,10,30,.35)}
+section:nth-of-type(odd)::before{transform:rotate(-.4deg)}
+section:nth-of-type(even)::before{transform:rotate(.35deg)}
+.welcome-card{box-shadow:none}
+button,select,input,.rules li,.board li,.mylein li,.earn .info{border-radius:255px 14px 225px 14px/14px 225px 14px 255px}
+button{border-width:2px}
+button.primary{position:relative;isolation:isolate;background:transparent;border-color:transparent}
+button.primary::before{content:"";position:absolute;inset:-2px;z-index:-1;background:var(--ice);border-radius:inherit;filter:url(#rough)}
+button.primary:hover{background:transparent}
+button.primary:hover::before{background:var(--ice-soft)}
+button.ghost{border:2px dashed var(--line)}
+.rules li:nth-child(odd),.board li:nth-child(odd){transform:rotate(-.3deg)}
+.rules li:nth-child(even),.board li:nth-child(even){transform:rotate(.3deg)}
+.chip{border-radius:60% 40% 55% 45%/50% 60% 40% 50%;border-width:2px}
+.prize .bar{height:16px;border:0;background:transparent;position:relative;overflow:visible}
+.prize .bar::before{content:"";position:absolute;inset:0;background:var(--black);border-radius:99px 30px 99px 30px;filter:url(#rough)}
+.prize .bar span{position:relative;height:100%;border-radius:99px 30px 99px 30px;filter:url(#rough)}
+.toast{border-radius:255px 14px 225px 14px/14px 225px 14px 255px;font-family:var(--display);font-weight:400;font-size:20px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;position:relative;z-index:1}
+.tabs button{padding:10px 6px;font-size:13px;font-weight:500;color:var(--muted);background:var(--black);line-height:1.2}
+.tabs button[aria-selected="true"]{position:relative;isolation:isolate;color:var(--black);background:transparent;border-color:transparent;font-weight:700}
+.tabs button[aria-selected="true"]::before{content:"";position:absolute;inset:-2px;z-index:-1;background:var(--ice);border-radius:inherit;filter:url(#rough)}
+@media (max-width:420px){.tabs button{font-size:12px;padding:10px 4px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="rough" x="-5%" y="-10%" width="110%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.035 0.08" numOctaves="3" seed="7" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+<canvas id="paint" aria-hidden="true"></canvas>
+
+<p class="note" id="loading" style="position:relative;z-index:1;text-align:center;padding-top:40vh;font-size:16px">Loading…</p>
+
+<div class="welcome" id="welcome" hidden>
+  <div class="welcome-card">
+    <div class="heb">ברוכים הבאים</div>
+    <h1>Minyan <span>Points</span></h1>
+    <p style="margin:0;color:var(--muted)">Welcome! Type your name to start.</p>
+    <input id="newName" placeholder="Your name" maxlength="30" aria-label="Your name" autocomplete="off">
+    <button id="addBtn" class="primary">Start</button>
+    <div id="existingWrap" hidden style="display:flex;flex-direction:column;gap:8px">
+      <div class="label">Already on the list?</div>
+      <select id="pick" aria-label="Pick your name"></select>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="main" hidden>
+  <header>
+    <div>
+      <div class="label">Boys minyan</div>
+      <h1>Minyan <span>Points</span></h1>
+    </div>
+    <div class="top-right">
+      <div class="heb">בס״ד</div>
+      <button id="adminOpen" class="ghost">🔒 Admin</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" data-tab="me">⭐ My Points</button>
+    <button role="tab" data-tab="lein">📖 Leining</button>
+    <button role="tab" data-tab="board">🏆 Leaderboard</button>
+  </nav>
+
+  <section class="hello" data-panel="me" aria-labelledby="hi">
+    <div class="me" style="justify-content:space-between">
+      <div>
+        <div class="label">Shalom</div>
+        <h2 id="hi">Hi, <span id="myName"></span></h2>
+      </div>
+      <button id="switchBtn">Not you?</button>
+    </div>
+    <div class="score">
+      <span class="big" id="myPts">0</span>
+      <span class="label">your points</span>
+      <span class="chip" id="weekInfo" style="margin-left:auto"></span>
+    </div>
+    <div class="prize" id="prizeBox">
+      <div class="bar"><span id="prizeBar"></span></div>
+      <div id="prizeText"></div>
+    </div>
+  </section>
+
+  <section data-panel="me" aria-labelledby="earnH">
+    <h2 id="earnH">The rules · what you get points for</h2>
+    <ol class="rules" id="earn"></ol>
+    <ul class="extra">
+      <li><b>You only get points on Shabbos.</b> 1 point for each rule, so up to 4 points each Shabbos.</li>
+      <li><b>Bring a friend 2 weeks in a row</b> and get <span class="pts">+3 extra</span>.</li>
+      <li><b>Get 6 points</b> and win a <span class="pts">£10 Amazon gift card</span> 🎁</li>
+    </ul>
+    <p class="note" id="earnNote" style="margin:0">Only the admin gives points.</p>
+  </section>
+
+
+  <section data-panel="lein" aria-labelledby="leinH">
+    <h2 id="leinH">Lein <span class="heb" style="font-size:16px">· קריאת התורה</span></h2>
+    <div class="row">
+      <label class="label" for="parsha">Parsha</label>
+      <select id="parsha" class="grow"></select>
+    </div>
+    <p class="note" style="margin:0">Pick a part to say. After you lein it, the admin gives you 1 point.</p>
+    <div class="parts" id="parts"></div>
+    <div>
+      <div class="label" style="margin-bottom:8px">Your leining</div>
+      <ul class="mylein" id="myLein"></ul>
+    </div>
+  </section>
+
+  <section data-panel="board" aria-labelledby="boardH">
+    <h2 id="boardH">Leaderboard</h2>
+    <ul class="board" id="board"></ul>
+  </section>
+
+</div>
+
+<div class="wrap" id="adminPage" hidden>
+  <header>
+    <div>
+      <div class="label">Minyan Points</div>
+      <h1>Admin</h1>
+    </div>
+    <button id="adminBack">← Back</button>
+  </header>
+
+  <section class="admin" id="codeBox" aria-labelledby="codeH">
+    <h2 id="codeH">Enter the admin code</h2>
+    <p class="note" style="margin:0">Type the admin code to give points.</p>
+    <div class="row">
+      <input id="codeIn" class="grow" type="password" placeholder="Admin code" aria-label="Admin code" autocomplete="off">
+      <button id="codeGo" class="primary">Enter</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="adminH" id="adminBox" hidden class="admin">
+    <div class="row" style="justify-content:space-between">
+      <h2 id="adminH">Admin · Give points</h2>
+      <span class="chip admin-chip">Admin</span>
+    </div>
+    <div class="row">
+      <select id="givePick" class="grow" aria-label="Choose a boy"></select>
+      <button id="removeBtn">Remove name</button>
+    </div>
+    <p class="note" id="shabbosFor" style="margin:0;color:var(--ice-soft)"></p>
+    <div class="earn" id="giveBtns"></div>
+    <p class="note" id="weekFull" hidden style="margin:0;color:var(--ice-soft)">This boy has all 4 points for this Shabbos.</p>
+    <div class="row">
+      <button id="bonusBtn" class="grow">Brought a friend 2 weeks in a row · +3</button>
+      <button id="minusBtn">Take away 1</button>
+    </div>
+    <div>
+      <div class="label" style="margin-bottom:8px">Gift cards to give</div>
+      <ul class="mylein" id="gifts"></ul>
+    </div>
+    <div>
+      <div class="label" style="margin-bottom:8px">Leining waiting for points</div>
+      <ul class="mylein" id="pending"></ul>
+    </div>
+    <button id="lockBtn">Leave admin</button>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const EARN = [
+  {k:"time", t:"Coming on time", d:"Be there when davening starts."},
+  {k:"daven", t:"Davening", d:"Come and daven with the minyan."},
+  {k:"join", t:"Joining in the davening", d:"Say it out loud, answer Amen and Kaddish."},
+  {k:"lein", t:"Leining", d:"Sign up below and lein a part of the parsha."},
+];
+const WEEK_MAX = 4, BONUS = 3, PRIZE_AT = 6;
+const PARTS = [
+  {k:"rishon", t:"Rishon", h:"ראשון"},
+  {k:"sheni", t:"Sheni", h:"שני"},
+  {k:"shlishi", t:"Shlishi", h:"שלישי"},
+  {k:"revii", t:"Revi'i", h:"רביעי"},
+  {k:"chamishi", t:"Chamishi", h:"חמישי"},
+  {k:"shishi", t:"Shishi", h:"ששי"},
+  {k:"shevii", t:"Shevi'i", h:"שביעי"},
+  {k:"maftir", t:"Maftir", h:"מפטיר"},
+  {k:"haftorah", t:"Haftorah", h:"הפטרה"},
+];
+const PARSHIYOS = "Bereishis,Noach,Lech Lecha,Vayera,Chayei Sarah,Toldos,Vayetzei,Vayishlach,Vayeshev,Miketz,Vayigash,Vayechi,Shemos,Va'era,Bo,Beshalach,Yisro,Mishpatim,Terumah,Tetzaveh,Ki Sisa,Vayakhel,Pekudei,Vayikra,Tzav,Shemini,Tazria,Metzora,Acharei Mos,Kedoshim,Emor,Behar,Bechukosai,Bamidbar,Naso,Beha'aloscha,Shelach,Korach,Chukas,Balak,Pinchas,Matos,Masei,Devarim,Va'eschanan,Eikev,Re'eh,Shoftim,Ki Seitzei,Ki Savo,Nitzavim,Vayeilech,Ha'azinu,Vezos Haberachah".split(",");
+const DEFAULT_PARSHA = "Vayera"; // Shabbos 31 Oct 2026
+
+const $ = id => document.getElementById(id);
+let boys = {}, pts = {}, leins = {}, week = "";
+let loaded = false;
+let me = null, adminCode = "";
+try { me = localStorage.getItem("mp_me"); adminCode = localStorage.getItem("mp_code") || ""; } catch(e){}
+let isAdmin = false;
+
+/* ---------- talking to the server ---------- */
+function apply(s){ boys = s.boys||{}; pts = s.pts||{}; leins = s.leins||{}; week = s.week||""; loaded = true; render(); }
+async function load(){
+  try{ const r = await fetch("/api/state", {cache:"no-store"}); if(r.ok) apply(await r.json()); }
+  catch(e){}
+}
+async function api(action, data = {}){
+  let r, j = {};
+  try{
+    r = await fetch("/api/act", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action, code: adminCode, ...data})});
+    j = await r.json().catch(()=>({}));
+  }catch(e){ toast("No internet. Try again."); return null; }
+  if(!r.ok){ toast(j.error || "Couldn't save. Try again."); if(r.status===401) lockAdmin(); return null; }
+  if(j.state) apply(j.state);
+  return j;
+}
+
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast.h); toast.h=setTimeout(()=>t.hidden=true,2400); }
+
+/* points belong to the most recent Shabbos (the server works this out) */
+const shabbosLabel = () => week ? new Date(week+"T12:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}) : "";
+const rec = id => pts[id] || {points:0, week:"", done:[], given:0};
+const doneOf = id => rec(id).week===week ? (rec(id).done||[]) : [];
+const pointsOf = id => rec(id).points || 0;
+const weekOf = id => doneOf(id).length;
+const cardsEarned = id => Math.floor(pointsOf(id)/PRIZE_AT);
+const giftMsg = (id, before) => cardsEarned(id) > before ? " · Gift card earned! 🎁" : "";
+
+/* ---------- admin actions ---------- */
+async function giveRule(boyId, key, why){
+  if(!boys[boyId]) { toast("Choose a boy first"); return; }
+  const before = cardsEarned(boyId), name = boys[boyId].name;
+  if(await api("give", {boyId, key})) toast(`+1 to ${name} · ${why}` + giftMsg(boyId, before));
+}
+async function awardLein(leinId, boyId, why){
+  const before = cardsEarned(boyId), name = boys[boyId].name;
+  if(await api("awardLein", {leinId})) toast(`+1 to ${name} · ${why}` + giftMsg(boyId, before));
+}
+async function giveBonus(boyId){
+  if(!boys[boyId]) { toast("Choose a boy first"); return; }
+  const before = cardsEarned(boyId), name = boys[boyId].name;
+  if(await api("bonus", {boyId})) toast(`+${BONUS} bonus to ${name}` + giftMsg(boyId, before));
+}
+async function takeOne(boyId){
+  if(!boys[boyId]) { toast("Choose a boy first"); return; }
+  const name = boys[boyId].name;
+  if(await api("minus", {boyId})) toast(`-1 from ${name}`);
+}
+async function markGiven(boyId){
+  const name = boys[boyId].name;
+  if(await api("markGiven", {boyId})) toast(`Gift card given to ${name}`);
+}
+function lockAdmin(){ adminCode = ""; isAdmin = false; try{ localStorage.removeItem("mp_code"); }catch(e){} render(); }
+
+/* ---------- render ---------- */
+function render(){
+  const ids = Object.keys(boys).sort((a,b)=>boys[a].name.localeCompare(boys[b].name));
+  const signedIn = !!boys[me];
+  const adminView = location.hash === "#admin";
+  $("loading").hidden = loaded || adminView;
+  $("adminPage").hidden = !adminView;
+  $("welcome").hidden = !loaded || signedIn || adminView;
+  $("main").hidden = !loaded || !signedIn || adminView;
+  const pick = $("pick");
+  pick.innerHTML = "";
+  pick.add(new Option("Choose your name…", ""));
+  ids.forEach(id => pick.add(new Option(boys[id].name, id)));
+  $("existingWrap").hidden = !ids.length;
+
+  if(signedIn){
+    $("myName").textContent = boys[me].name;
+    const p = pointsOf(me), wn = weekOf(me);
+    $("myPts").textContent = p;
+    $("weekInfo").textContent = `${wn} of ${WEEK_MAX} this Shabbos`;
+    const toNext = PRIZE_AT - (p % PRIZE_AT);
+    $("prizeBar").style.width = ((p % PRIZE_AT)/PRIZE_AT*100) + "%";
+    const earned = cardsEarned(me), given = rec(me).given||0;
+    $("prizeText").textContent = earned > given
+      ? `You've earned a £10 Amazon gift card! Ask the admin for it.`
+      : `${toNext} more point${toNext===1?"":"s"} to a £10 Amazon gift card`;
+    $("prizeBox").classList.toggle("won", earned > given);
+  }
+
+  // the rules
+  const earn = $("earn"); earn.innerHTML = "";
+  EARN.forEach(e=>{
+    const li = document.createElement("li");
+    li.innerHTML = `<span><b></b><small></small></span><span class="pts">+1</span>`;
+    li.querySelector("b").textContent = e.t;
+    li.querySelector("small").textContent = e.d;
+    earn.append(li);
+  });
+  $("codeBox").hidden = isAdmin;
+  $("adminOpen").textContent = isAdmin ? "Admin" : "🔒 Admin";
+
+  // admin panel
+  $("adminBox").hidden = !isAdmin;
+  if(isAdmin){
+    const gp = $("givePick"), keep = gp.value;
+    gp.innerHTML = ""; gp.add(new Option(ids.length ? "Choose a boy…" : "No names yet", ""));
+    ids.forEach(id => gp.add(new Option(`${boys[id].name} · ${pointsOf(id)} pts · ${weekOf(id)}/${WEEK_MAX} this Shabbos`, id)));
+    gp.value = boys[keep] ? keep : "";
+    const sel = gp.value, full = sel && weekOf(sel) >= WEEK_MAX, done = sel ? doneOf(sel) : [];
+    $("shabbosFor").textContent = `Giving points for Shabbos ${shabbosLabel()}`;
+    const gb = $("giveBtns"); gb.innerHTML = "";
+    EARN.filter(e=>e.k!=="lein").forEach(e=>{
+      const b = document.createElement("button");
+      const got = done.includes(e.k);
+      b.innerHTML = `<b></b><span class="pts"></span>`;
+      b.querySelector("b").textContent = e.t;
+      b.querySelector(".pts").textContent = got ? "✓ Given" : "+1 point";
+      b.disabled = !sel || full || got;
+      b.onclick = () => giveRule(sel, e.k, e.t);
+      gb.append(b);
+    });
+    $("weekFull").hidden = !full;
+    $("bonusBtn").disabled = !sel;
+    $("minusBtn").disabled = !sel || !pointsOf(sel);
+    $("removeBtn").disabled = !sel;
+
+    const pend = $("pending"); pend.innerHTML = "";
+    const waiting = Object.entries(leins).filter(([,l])=>!l.awarded && boys[l.boyId]);
+    if(!waiting.length) pend.innerHTML = `<li class="empty">No leining waiting.</li>`;
+    waiting.forEach(([id,l])=>{
+      const part = PARTS.find(p=>p.k===l.part); if(!part) return;
+      const li = document.createElement("li");
+      li.innerHTML = `<span></span>`;
+      li.firstChild.textContent = `${boys[l.boyId].name} · ${part.t} · ${l.parsha}`;
+      const b = document.createElement("button"); b.className="primary"; b.textContent = "Give +1";
+      const leinDone = doneOf(l.boyId).includes("lein");
+      b.disabled = leinDone || weekOf(l.boyId) >= WEEK_MAX;
+      if(b.disabled) b.textContent = leinDone ? "Already got leining point" : "Shabbos full";
+      b.onclick = () => awardLein(id, l.boyId, `Leined ${part.t}`);
+      li.append(b); pend.append(li);
+    });
+
+    const gifts = $("gifts"); gifts.innerHTML = "";
+    const owed = ids.filter(id => cardsEarned(id) > (rec(id).given||0));
+    if(!owed.length) gifts.innerHTML = `<li class="empty">Nobody is waiting for a gift card.</li>`;
+    owed.forEach(id=>{
+      const li = document.createElement("li");
+      li.innerHTML = `<span></span>`;
+      li.firstChild.textContent = `🎁 ${boys[id].name} · £10 Amazon`;
+      const b = document.createElement("button"); b.className="primary"; b.textContent = "Mark as given";
+      b.onclick = () => markGiven(id);
+      li.append(b); gifts.append(li);
+    });
+  }
+
+  // lein parts for chosen parsha
+  const parsha = $("parsha").value;
+  const parts = $("parts"); parts.innerHTML = "";
+  PARTS.forEach(p=>{
+    const takenId = Object.keys(leins).find(id => leins[id].parsha===parsha && leins[id].part===p.k);
+    const t = takenId && leins[takenId];
+    const b = document.createElement("button");
+    b.className = "part" + (t ? (t.boyId===me ? " mine" : " taken") : "") + (t&&t.awarded ? " done":"");
+    b.innerHTML = `<span class="heb"></span><b></b><small class="pts"></small>`;
+    b.querySelector(".heb").textContent = p.h;
+    b.querySelector("b").textContent = p.t;
+    b.querySelector("small").textContent = t ? (t.boyId===me ? (t.awarded?"You leined it ✓":"You're saying this") : (boys[t.boyId]?.name||"Taken")) : "+1 point";
+    b.disabled = !boys[me] || (t && t.boyId!==me) || (t && t.awarded);
+    b.onclick = async () => {
+      if(t && t.boyId===me){ if(await api("dropLein", {leinId:takenId, boyId:me})) toast("Removed"); return; }
+      if(await api("signLein", {boyId:me, parsha, part:p.k})) toast(`You're saying ${p.t}`);
+    };
+    parts.append(b);
+  });
+
+  const my = $("myLein"); my.innerHTML = "";
+  const mine = Object.entries(leins).filter(([,l])=>l.boyId===me);
+  if(!mine.length){ my.innerHTML = `<li class="empty">Nothing yet. Pick a part above.</li>`; }
+  mine.forEach(([,l])=>{
+    const part = PARTS.find(p=>p.k===l.part); if(!part) return;
+    const li = document.createElement("li");
+    li.innerHTML = `<span></span>`;
+    li.firstChild.textContent = `${part.t} · ${l.parsha}`;
+    li.insertAdjacentHTML("beforeend", l.awarded ? `<span class="chip done">Got +1</span>` : `<span class="chip">Waiting for admin</span>`);
+    my.append(li);
+  });
+
+  const board = $("board"); board.innerHTML = "";
+  const ranked = Object.keys(boys).sort((a,b)=>pointsOf(b)-pointsOf(a));
+  ranked.forEach((id,i)=>{
+    const li = document.createElement("li"); if(id===me) li.className="you";
+    li.innerHTML = `<span class="rank">${i+1}</span><span class="n"></span><span class="p"></span>`;
+    li.querySelector(".n").textContent = boys[id].name + (id===me ? " (you)" : "");
+    li.querySelector(".p").textContent = pointsOf(id) + " pts";
+    board.append(li);
+  });
+}
+
+/* ---------- controls ---------- */
+PARSHIYOS.forEach(p => $("parsha").add(new Option(p, p)));
+$("parsha").value = DEFAULT_PARSHA;
+$("parsha").onchange = render;
+$("givePick").onchange = render;
+$("bonusBtn").onclick = () => giveBonus($("givePick").value);
+$("minusBtn").onclick = () => takeOne($("givePick").value);
+$("removeBtn").onclick = async () => {
+  const id = $("givePick").value; if(!boys[id]) return;
+  const name = boys[id].name;
+  if(!confirm(`Remove ${name} and all their points?`)) return;
+  if(await api("removeBoy", {boyId:id})) toast(`Removed ${name}`);
+};
+$("pick").onchange = e => { if(!e.target.value) return; me = e.target.value; try{ localStorage.setItem("mp_me", me); }catch(x){} render(); window.scrollTo(0,0); };
+$("switchBtn").onclick = () => { me = null; try{ localStorage.removeItem("mp_me"); }catch(x){} render(); };
+$("addBtn").onclick = async () => {
+  const name = $("newName").value.trim();
+  if(!name){ toast("Type your name first"); return; }
+  const j = await api("addBoy", {name});
+  if(!j) return;
+  me = j.id; try{ localStorage.setItem("mp_me", me); }catch(x){}
+  $("newName").value = "";
+  render(); toast(`Welcome, ${name}!`);
+};
+$("newName").onkeydown = e => { if(e.key==="Enter") $("addBtn").click(); };
+$("adminOpen").onclick = () => { location.hash = "admin"; };
+$("adminBack").onclick = () => { try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){ location.hash = ""; } render(); window.scrollTo(0,0); };
+window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); });
+$("codeGo").onclick = async () => {
+  const v = $("codeIn").value.trim(); if(!v) return;
+  $("codeIn").value = "";
+  const old = adminCode; adminCode = v;
+  if(await api("checkCode")){ isAdmin = true; try{ localStorage.setItem("mp_code", v); }catch(e){} render(); toast("You're the admin now"); }
+  else adminCode = old;
+};
+$("codeIn").onkeydown = e => { if(e.key==="Enter") $("codeGo").click(); };
+$("lockBtn").onclick = () => { lockAdmin(); toast("Left admin"); };
+
+render();
+load().then(async () => {
+  if(adminCode){ const j = await fetch("/api/act",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"checkCode",code:adminCode})}).catch(()=>null);
+    if(j && j.ok){ isAdmin = true; render(); } else if(j && j.status===400) lockAdmin(); }
+});
+setInterval(() => { if(!document.hidden) load(); }, 15000);
+document.addEventListener("visibilitychange", () => { if(!document.hidden) load(); });
+
+/* ---------- tabs ---------- */
+let tab = "me";
+try{ tab = localStorage.getItem("mp_tab") || "me"; }catch(e){}
+function showTab(t){
+  tab = t;
+  document.querySelectorAll("[data-panel]").forEach(el => el.hidden = el.dataset.panel !== t);
+  document.querySelectorAll(".tabs [data-tab]").forEach(b => { b.setAttribute("aria-selected", b.dataset.tab === t); b.tabIndex = b.dataset.tab === t ? 0 : -1; });
+  try{ localStorage.setItem("mp_tab", t); }catch(e){}
+}
+document.querySelectorAll(".tabs [data-tab]").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+showTab(document.querySelector(`.tabs [data-tab="${tab}"]`) ? tab : "me");
+
+/* ---------- paint splatter background ---------- */
+(function(){
+  const c = document.getElementById("paint"), x = c.getContext("2d");
+  function rnd(seed){ return () => (seed = (seed*16807) % 2147483647) / 2147483647; }
+  function blob(r, cx, cy, rad, col){
+    x.fillStyle = col; x.beginPath();
+    const n = 14;
+    for(let i=0;i<=n;i++){ const a = i/n*Math.PI*2, k = rad*(0.75+r()*0.5);
+      const px = cx+Math.cos(a)*k, py = cy+Math.sin(a)*k;
+      i ? x.quadraticCurveTo(cx+Math.cos(a-.2)*k*1.1, cy+Math.sin(a-.2)*k*1.1, px, py) : x.moveTo(px,py); }
+    x.fill();
+  }
+  function splat(r, cx, cy, size, col){
+    blob(r, cx, cy, size, col);
+    for(let i=0;i<18;i++){ const a=r()*Math.PI*2, d=size*(1.1+r()*2.2), s=size*(0.04+r()*0.14);
+      x.beginPath(); x.arc(cx+Math.cos(a)*d, cy+Math.sin(a)*d, s, 0, Math.PI*2); x.fill(); }
+  }
+  function stroke(r, w, h, col){
+    x.strokeStyle = col; x.lineCap = "round";
+    let px = r()*w, py = r()*h; const ang = r()*Math.PI;
+    for(let i=0;i<90;i++){ x.lineWidth = 22*(1-i/90)+3;
+      const nx = px+Math.cos(ang+Math.sin(i/12)*.4)*5, ny = py+Math.sin(ang+Math.sin(i/12)*.4)*5;
+      x.beginPath(); x.moveTo(px,py); x.lineTo(nx,ny); x.stroke(); px=nx; py=ny; }
+    x.globalAlpha = 1;
+  }
+  function draw(){
+    const d = Math.min(window.devicePixelRatio||1, 2), w = innerWidth, h = innerHeight;
+    c.width = w*d; c.height = h*d; x.setTransform(d,0,0,d,0,0);
+    const g = x.createLinearGradient(0,0,w*.3,h);
+    g.addColorStop(0,"#16306e"); g.addColorStop(.55,"#0e2152"); g.addColorStop(1,"#0a1738");
+    x.fillStyle = g; x.fillRect(0,0,w,h);
+    const r = rnd(4242);
+    x.filter = "blur(40px)";
+    for(let i=0;i<6;i++) blob(r, r()*w, r()*h, 120+r()*180, i%2 ? "rgba(127,212,255,.10)" : "rgba(70,130,230,.16)");
+    x.filter = "none";
+    for(let i=0;i<4;i++) stroke(r, w, h, i%2 ? "rgba(127,212,255,.10)" : "rgba(90,150,240,.14)");
+    const n = Math.round(w*h/110000)+3;
+    for(let i=0;i<n;i++){ const white = r()<.3;
+      x.globalAlpha = white ? .16 : .26;
+      splat(r, r()*w, r()*h, 5+r()*12, white ? "#e6f6ff" : "#7fd4ff"); }
+    x.globalAlpha = 1;
+  }
+  draw(); let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(draw, 150); });
+})();
+</script>
+
+</body>
+</html>
