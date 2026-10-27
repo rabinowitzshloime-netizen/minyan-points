@@ -224,7 +224,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
     <div class="seg" role="tablist" aria-label="Log in or sign up">
       <button role="tab" data-mode="login">Log in</button>
       <button role="tab" data-mode="signup">Sign up</button>
-      <button role="tab" data-mode="claim" id="claimTab">I'm on the list</button>
+      <button role="tab" data-mode="claim" id="claimTab">No login yet</button>
     </div>
     <form class="auth" data-panel-mode="login" id="loginForm">
       <input id="liUser" placeholder="Username (the nickname you log in with)" autocomplete="username" autocapitalize="none" aria-label="Username">
@@ -241,7 +241,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
       <button class="primary" type="submit">Sign up</button>
     </form>
     <form class="auth" data-panel-mode="claim" id="claimForm" hidden>
-      <p class="note" style="margin:0">Your name is already on the list? Pick it and make a username and password. You only do this once.</p>
+      <p class="note" style="margin:0">For boys who were on the site <b>before</b> logins started. Pick your name and make a username and password. You only do this once.<br>Already made a login? Use <b>Log in</b> instead. Your name won't be in this list.</p>
       <select id="clPick" aria-label="Your name"></select>
       <input id="clUser" placeholder="Pick a username, e.g. shloime123" maxlength="20" autocomplete="username" autocapitalize="none" aria-label="Username">
       <p class="note hint" style="margin:-4px 0 0">A <b>username</b> is a nickname you log in with, like <b>shloime123</b>. Only you use it. Everyone else sees your real name. 3 to 20 letters or numbers, no spaces.</p>
@@ -691,7 +691,7 @@ $("claimForm").onsubmit = async e => { e.preventDefault();
 $("switchBtn").onclick = async () => { await api("logout"); tok = ""; me = null; try{ sessionStorage.removeItem("mp_tok"); }catch(x){} render(); toast("Logged out"); };
 $("resetBtn").onclick = async () => {
   const id = $("givePick").value; if(!boys[id]) return;
-  if(!confirm(`Reset ${boys[id].name}'s login? He'll pick a new username and password with "I'm on the list".`)) return;
+  if(!confirm(`Reset ${boys[id].name}'s login? He'll pick a new username and password with "No login yet".`)) return;
   if(await api("resetLogin", {boyId:id})) toast(`${boys[id].name} can set up his login again`);
 };
 $("adminOpen").onclick = () => { location.hash = "admin"; };
