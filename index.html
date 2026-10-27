@@ -452,12 +452,12 @@ const $ = id => document.getElementById(id);
 let boys = {}, pts = {}, leins = {}, week = "";
 let loaded = false;
 let me = null, adminCode = "", tok = "";
-try { tok = localStorage.getItem("mp_tok") || ""; adminCode = localStorage.getItem("mp_code") || ""; localStorage.removeItem("mp_me"); } catch(e){}
+try { tok = sessionStorage.getItem("mp_tok") || ""; adminCode = localStorage.getItem("mp_code") || ""; localStorage.removeItem("mp_me"); } catch(e){}
 let isAdmin = false;
 
 /* ---------- talking to the server ---------- */
 let posts = {}, votes = {}, myVotes = {};
-function apply(s){ boys = s.boys||{}; pts = s.pts||{}; leins = s.leins||{}; posts = s.posts||{}; votes = s.votes||{}; myVotes = s.myVotes||{}; me = s.me||null; if(!me && tok){ tok = ""; try{ localStorage.removeItem("mp_tok"); }catch(e){} } week = s.week||""; loaded = true; render(); }
+function apply(s){ boys = s.boys||{}; pts = s.pts||{}; leins = s.leins||{}; posts = s.posts||{}; votes = s.votes||{}; myVotes = s.myVotes||{}; me = s.me||null; if(!me && tok){ tok = ""; try{ sessionStorage.removeItem("mp_tok"); }catch(e){} } week = s.week||""; loaded = true; render(); }
 async function load(){
   try{ const r = await fetch("/api/state", {cache:"no-store", headers:{"x-token":tok, "x-code":adminCode}}); if(r.ok) apply(await r.json()); }
   catch(e){}
@@ -469,7 +469,7 @@ async function api(action, data = {}){
     j = await r.json().catch(()=>({}));
   }catch(e){ toast("No internet. Try again."); return null; }
   if(!r.ok){ toast(j.error || "Couldn't save. Try again."); if(r.status===401) lockAdmin(); return null; }
-  if(j.token){ tok = j.token; try{ localStorage.setItem("mp_tok", tok); }catch(e){} }
+  if(j.token){ tok = j.token; try{ sessionStorage.setItem("mp_tok", tok); }catch(e){} }
   if(j.state) apply(j.state);
   return j;
 }
@@ -687,7 +687,7 @@ $("signupForm").onsubmit = async e => { e.preventDefault();
 $("claimForm").onsubmit = async e => { e.preventDefault();
   const id = $("clPick").value; if(!id){ toast("Choose your name"); return; }
   loggedIn(await api("claim", {boyId:id, username:$("clUser").value, password:$("clPass").value}), "You're all set up! 🎉"); };
-$("switchBtn").onclick = async () => { await api("logout"); tok = ""; me = null; try{ localStorage.removeItem("mp_tok"); }catch(x){} render(); toast("Logged out"); };
+$("switchBtn").onclick = async () => { await api("logout"); tok = ""; me = null; try{ sessionStorage.removeItem("mp_tok"); }catch(x){} render(); toast("Logged out"); };
 $("resetBtn").onclick = async () => {
   const id = $("givePick").value; if(!boys[id]) return;
   if(!confirm(`Reset ${boys[id].name}'s login? He'll pick a new username and password with "I'm on the list".`)) return;
