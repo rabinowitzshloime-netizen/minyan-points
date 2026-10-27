@@ -452,7 +452,7 @@ const $ = id => document.getElementById(id);
 let boys = {}, pts = {}, leins = {}, week = "";
 let loaded = false;
 let me = null, adminCode = "", tok = "";
-try { tok = sessionStorage.getItem("mp_tok") || ""; adminCode = localStorage.getItem("mp_code") || ""; localStorage.removeItem("mp_me"); } catch(e){}
+try { tok = sessionStorage.getItem("mp_tok") || ""; adminCode = sessionStorage.getItem("mp_code") || ""; localStorage.removeItem("mp_me"); localStorage.removeItem("mp_code"); localStorage.removeItem("mp_tok"); } catch(e){}
 let isAdmin = false;
 
 /* ---------- talking to the server ---------- */
@@ -509,7 +509,7 @@ async function markGiven(boyId){
   const name = boys[boyId].name;
   if(await api("markGiven", {boyId})) toast(`Gift card given to ${name}`);
 }
-function lockAdmin(){ adminCode = ""; isAdmin = false; try{ localStorage.removeItem("mp_code"); }catch(e){} render(); }
+function lockAdmin(){ adminCode = ""; isAdmin = false; try{ sessionStorage.removeItem("mp_code"); }catch(e){} render(); }
 
 /* ---------- render ---------- */
 function render(){
@@ -700,7 +700,7 @@ $("codeGo").onclick = async () => {
   const v = $("codeIn").value.trim(); if(!v) return;
   $("codeIn").value = "";
   const old = adminCode; adminCode = v;
-  if(await api("checkCode")){ isAdmin = true; try{ localStorage.setItem("mp_code", v); }catch(e){} render(); toast("You're the admin now"); load(); }
+  if(await api("checkCode")){ isAdmin = true; try{ sessionStorage.setItem("mp_code", v); }catch(e){} render(); toast("You're the admin now"); load(); }
   else adminCode = old;
 };
 $("codeIn").onkeydown = e => { if(e.key==="Enter") $("codeGo").click(); };
