@@ -196,8 +196,8 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .opt.mine{border-color:var(--ice);font-weight:700}
 .opt .n{font-variant-numeric:tabular-nums;color:var(--ice);font-weight:700;white-space:nowrap}
 .poll .note{margin:0}
-.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.seg button{padding:8px 4px;font-size:13px;color:var(--muted);background:var(--black)}
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:6px}
+.seg button{padding:8px 4px;font-size:12px;color:var(--muted);background:var(--black)}
 .seg button[aria-selected="true"]{color:var(--black);background:var(--ice);border-color:var(--ice);font-weight:700}
 .auth{display:flex;flex-direction:column;gap:10px}
 .auth input,.auth select{font-size:16px;padding:12px}
@@ -225,6 +225,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
       <button role="tab" data-mode="login">Log in</button>
       <button role="tab" data-mode="signup">Sign up</button>
       <button role="tab" data-mode="claim" id="claimTab">No login yet</button>
+      <button role="tab" data-mode="admin">🔒 Admin</button>
     </div>
     <form class="auth" data-panel-mode="login" id="loginForm">
       <input id="liUser" placeholder="Username (the nickname you log in with)" autocomplete="username" autocapitalize="none" aria-label="Username">
@@ -239,6 +240,12 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
       <input id="suPass" type="password" placeholder="Pick a password" autocomplete="new-password" aria-label="Password">
       <p class="note" style="margin:-4px 0 0">Your <b>password</b> is your secret, at least 4 characters. Don't tell anyone, and remember it!</p>
       <button class="primary" type="submit">Sign up</button>
+    </form>
+    <form class="auth" data-panel-mode="admin" id="adminForm" hidden>
+      <p class="note" style="margin:0">For the admin only.</p>
+      <input id="adUser" placeholder="Admin username" autocomplete="username" autocapitalize="none" aria-label="Admin username">
+      <input id="adPass" type="password" placeholder="Admin password" autocomplete="current-password" aria-label="Admin password">
+      <button class="primary" type="submit">Log in to admin</button>
     </form>
     <form class="auth" data-panel-mode="claim" id="claimForm" hidden>
       <p class="note" style="margin:0">For boys who were on the site <b>before</b> logins started. Pick your name and make a username and password. You only do this once.<br>Already made a login? Use <b>Log in</b> instead. Your name won't be in this list.</p>
@@ -679,6 +686,13 @@ $("loginForm").onsubmit = async e => { e.preventDefault();
   const u = $("liUser").value.trim(), p = $("liPass").value;
   if(!u || !p){ toast("Type your username and password"); return; }
   const j = await api("login", {username:u, password:p});
+  if(j && j.admin){ toast("Use the 🔒 Admin tab to log in as admin"); return; }
+  if(j) loggedIn(j, `Welcome back, ${boys[me]?.name || ""}!`); };
+$("adminForm").onsubmit = async e => { e.preventDefault();
+  const u = $("adUser").value.trim(), p = $("adPass").value;
+  if(!u || !p){ toast("Type the admin username and password"); return; }
+  const j = await api("login", {username:u, password:p, wantAdmin:true});
+  if(j && !j.admin){ toast("That's not the admin login"); await api("logout"); tok = ""; me = null; try{ sessionStorage.removeItem("mp_tok"); }catch(x){} render(); return; }
   if(j && j.admin){ adminCode = p; isAdmin = true; try{ sessionStorage.setItem("mp_code", p); }catch(e){} loggedIn(j, "Welcome, admin! 🔒"); location.hash = "admin"; load(); return; }
   if(j) loggedIn(j, `Welcome back, ${boys[me]?.name || ""}!`); };
 $("signupForm").onsubmit = async e => { e.preventDefault();
