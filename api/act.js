@@ -1,6 +1,7 @@
 import { redis, getState, isAdmin, weekKey, RULES, PARTS, WEEK_MAX, BONUS, publicState, sessionUser, newSession, hashPw, checkPw, cleanUser, USER_OK } from "../lib/shared.js";
 import { cleanHtml, imgSrcs } from "../lib/clean.js";
 
+const ADMIN_USER = cleanUser(process.env.ADMIN_USER || "admin");
 const id = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 class Oops extends Error {}
 const no = msg => { throw new Oops(msg); };
@@ -17,6 +18,7 @@ export default async function handler(req, res) {
     const checkNew = async () => {
       const username = cleanUser(b.username), password = String(b.password || "");
       if (!USER_OK.test(username)) no("Usernames need 3 to 20 letters or numbers, no spaces.");
+      if (username === ADMIN_USER) no("Someone already has that username. Try another one.");
       if (password.length < 4) no("Make your password at least 4 characters.");
       if (password.length > 64) no("That password is too long.");
       return { username, password };
@@ -57,6 +59,12 @@ export default async function handler(req, res) {
         const failKey = "fail:" + username;
         const fails = Number(await redis.get(failKey)) || 0;
         if (fails >= 10) no("Too many wrong tries. Wait 15 minutes, or ask the admin.");
+        if (username === ADMIN_USER) {
+          if (!isAdmin(String(b.password || ""))) { await redis.incr(failKey); await redis.expire(failKey, 900); no("Wrong username or password."); }
+          await redis.del(failKey);
+          out.admin = true; b.code = String(b.password); me = null;
+          break;
+        }
         const bid = await redis.hget("unames", username);
         const rec = bid && s.boys[bid];
         if (!rec || !checkPw(b.password || "", rec.pw)) {

@@ -249,7 +249,6 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
       <p class="note" style="margin:-4px 0 0">Your <b>password</b> is your secret, at least 4 characters. Don't tell anyone, and remember it!</p>
       <button class="primary" type="submit">Set up my login</button>
     </form>
-    <button type="button" id="adminLogin" class="ghost" style="align-self:center">🔒 Admin log in</button>
   </div>
 </div>
 
@@ -349,7 +348,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
         </div>
       </div>
     </div>
-    <button id="adminBack">← Back</button>
+    <button id="adminBack" hidden>← Back</button>
   </header>
 
   <section class="admin" id="codeBox" aria-labelledby="codeH">
@@ -386,7 +385,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
       <div class="label" style="margin-bottom:8px">Leining waiting for points</div>
       <ul class="mylein" id="pending"></ul>
     </div>
-    <button id="lockBtn">Leave admin</button>
+    <button id="lockBtn">Log out of admin</button>
   </section>
 
   <section aria-labelledby="postH" id="postBox" hidden class="admin">
@@ -515,7 +514,7 @@ function lockAdmin(){ adminCode = ""; isAdmin = false; try{ sessionStorage.remov
 function render(){
   const ids = Object.keys(boys).sort((a,b)=>boys[a].name.localeCompare(boys[b].name));
   const signedIn = !!boys[me];
-  const adminView = location.hash === "#admin";
+  const adminView = location.hash === "#admin" && isAdmin;
   $("loading").hidden = loaded || adminView;
   $("adminPage").hidden = !adminView;
   $("welcome").hidden = !loaded || signedIn || adminView;
@@ -553,7 +552,7 @@ function render(){
     li.querySelector("small").textContent = e.d;
     earn.append(li);
   });
-  $("codeBox").hidden = isAdmin;
+  $("codeBox").hidden = true;
 
   // admin panel
   $("adminBox").hidden = !isAdmin;
@@ -679,7 +678,9 @@ function loggedIn(j, msg){ if(!j) return; document.querySelectorAll(".auth input
 $("loginForm").onsubmit = async e => { e.preventDefault();
   const u = $("liUser").value.trim(), p = $("liPass").value;
   if(!u || !p){ toast("Type your username and password"); return; }
-  const j = await api("login", {username:u, password:p}); if(j) loggedIn(j, `Welcome back, ${boys[me]?.name || ""}!`); };
+  const j = await api("login", {username:u, password:p});
+  if(j && j.admin){ adminCode = p; isAdmin = true; try{ sessionStorage.setItem("mp_code", p); }catch(e){} loggedIn(j, "Welcome, admin! 🔒"); location.hash = "admin"; load(); return; }
+  if(j) loggedIn(j, `Welcome back, ${boys[me]?.name || ""}!`); };
 $("signupForm").onsubmit = async e => { e.preventDefault();
   const n = $("suName").value.trim(); if(!n){ toast("Type your name"); return; }
   loggedIn(await api("signup", {name:n, username:$("suUser").value, password:$("suPass").value}), `Welcome, ${n}! 🎉`); };
@@ -702,8 +703,7 @@ $("codeGo").onclick = async () => {
   else adminCode = old;
 };
 $("codeIn").onkeydown = e => { if(e.key==="Enter") $("codeGo").click(); };
-$("lockBtn").onclick = () => { lockAdmin(); toast("Left admin"); if(!boys[me]) $("adminBack").click(); };
-$("adminLogin").onclick = () => { location.hash = "admin"; setTimeout(() => $("codeIn").focus(), 50); };
+$("lockBtn").onclick = () => { lockAdmin(); try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){ location.hash = ""; } render(); window.scrollTo(0,0); toast("Logged out of admin"); };
 
 render();
 load().then(async () => {
