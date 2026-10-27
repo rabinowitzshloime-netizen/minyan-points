@@ -179,7 +179,23 @@ button.ghost{border:2px dashed var(--line)}
 .filebtn{cursor:pointer;display:inline-block;padding:8px 14px;border:2px solid var(--line);border-radius:255px 14px 225px 14px/14px 225px 14px 255px;color:var(--text);background:var(--navy-2)}
 .filebtn:hover{border-color:var(--ice)}
 textarea{font:inherit;color:var(--text);background:var(--black);border:2px solid var(--line);border-radius:14px;padding:10px 12px;min-height:90px;resize:vertical;width:100%}
-textarea:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+.editor{color:var(--text);background:var(--black);border:2px solid var(--line);border-radius:14px;padding:10px 12px;min-height:140px;max-height:420px;overflow:auto;cursor:text}
+.editor:empty::before{content:attr(data-ph);color:var(--muted)}
+.rich{display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere}
+.rich p,.rich ul,.rich ol,.rich h3,.rich h4{margin:0}
+.rich ul,.rich ol{padding-left:22px;display:block}
+.rich ul{list-style:disc}
+.rich ol{list-style:decimal}
+.rich h3{font-family:var(--display);font-weight:400;font-size:22px}
+.rich h4{font-family:var(--display);font-weight:400;font-size:19px;color:var(--ice-soft)}
+.rich img,.editor img{max-width:100%;height:auto;border-radius:10px}
+.poll{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.opt{position:relative;display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;width:100%;padding:12px 14px;overflow:hidden;isolation:isolate}
+.opt .fill{position:absolute;inset:0 auto 0 0;background:rgba(127,212,255,.22);z-index:-1;transition:width .5s}
+.opt.mine{border-color:var(--ice);font-weight:700}
+.opt .n{font-variant-numeric:tabular-nums;color:var(--ice);font-weight:700;white-space:nowrap}
+.poll .note{margin:0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -358,7 +374,7 @@ textarea:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
       </select>
       <input id="postTitle" class="grow" placeholder="Title, e.g. Trip to Blackpool" maxlength="80" aria-label="Title">
     </div>
-    <textarea id="postBody" placeholder="Details: where, what time, what to bring… (you can paste from Google Docs)" maxlength="3000" aria-label="Details"></textarea>
+    <div id="postBody" class="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Details" data-ph="Type the details here, or copy your whole Google Doc (Ctrl+A, Ctrl+C) and paste it here (Ctrl+V). It keeps the headings, bold, lists and pictures."></div>
     <div class="drop" id="drop">
       <img id="picPrev" alt="Picture for the post" hidden>
       <span id="dropText" class="grow">📷 Add a picture: drag it here, paste it (Ctrl+V), or</span>
@@ -366,7 +382,10 @@ textarea:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
       <input id="picIn" type="file" accept="image/*" hidden>
       <button id="picX" hidden>Remove picture</button>
     </div>
-    <input id="postLink" placeholder="🔗 Link (optional), e.g. your Google Doc or form" aria-label="Link">
+    <div>
+      <div class="label" style="margin-bottom:6px">🗳️ Add a vote (optional)</div>
+      <textarea id="postOpts" placeholder="Type each answer on its own line, e.g.&#10;Blackpool&#10;Laser Quest&#10;Bowling" style="min-height:80px" aria-label="Vote answers"></textarea>
+    </div>
     <div class="row">
       <label class="label" for="postWhen">Date (optional)</label>
       <input id="postWhen" type="date">
@@ -410,8 +429,8 @@ try { me = localStorage.getItem("mp_me"); adminCode = localStorage.getItem("mp_c
 let isAdmin = false;
 
 /* ---------- talking to the server ---------- */
-let posts = {};
-function apply(s){ boys = s.boys||{}; pts = s.pts||{}; leins = s.leins||{}; posts = s.posts||{}; week = s.week||""; loaded = true; render(); }
+let posts = {}, votes = {};
+function apply(s){ boys = s.boys||{}; pts = s.pts||{}; leins = s.leins||{}; posts = s.posts||{}; votes = s.votes||{}; week = s.week||""; loaded = true; render(); }
 async function load(){
   try{ const r = await fetch("/api/state", {cache:"no-store"}); if(r.ok) apply(await r.json()); }
   catch(e){}
@@ -681,6 +700,8 @@ function renderNews(){
     d.querySelector("h3").textContent = p.title;
     d.querySelector("p").textContent = p.body || "";
     if(!p.body) d.querySelector("p").remove();
+    if(p.html){ const r = document.createElement("div"); r.className = "rich"; r.innerHTML = p.html; d.append(r); }
+    if((p.options||[]).length > 1) d.append(pollEl(id, p));
     if(p.hasImg){
       const a = document.createElement("a"); a.className = "pic"; a.href = "/api/img?id=" + encodeURIComponent(id); a.target = "_blank"; a.rel = "noopener";
       const im = document.createElement("img"); im.src = a.href; im.alt = p.title; im.loading = "lazy";
@@ -713,9 +734,12 @@ $("postGo").onclick = async () => {
   const title = $("postTitle").value.trim();
   if(!title){ toast("Give the post a title"); return; }
   $("postGo").disabled = true; $("postGo").textContent = "Posting…";
-  const j = await api("addPost", {kind:$("postKind").value, title, body:$("postBody").value, when:$("postWhen").value, link:$("postLink").value, image: picData});
+  const options = $("postOpts").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  if(options.length === 1){ toast("A vote needs at least 2 answers"); return; }
+  const ed = $("postBody"), html = ed.textContent.trim() || ed.querySelector("img") ? ed.innerHTML : "";
+  const j = await api("addPost", {kind:$("postKind").value, title, html, when:$("postWhen").value, options, image: picData});
   $("postGo").disabled = false; $("postGo").textContent = "Post it";
-  if(j){ $("postTitle").value = ""; $("postBody").value = ""; $("postWhen").value = ""; $("postLink").value = ""; setPic(""); toast("Posted! The boys will see it 📢"); }
+  if(j){ $("postTitle").value = ""; $("postBody").innerHTML = ""; $("postWhen").value = ""; $("postOpts").value = ""; setPic(""); toast("Posted! The boys will see it 📢"); }
 };
 /* picture for a post: shrink it so it uploads fast */
 let picData = "";
@@ -746,6 +770,60 @@ const dropEl = $("drop");
 ["dragenter","dragover"].forEach(t => dropEl.addEventListener(t, e => { e.preventDefault(); dropEl.classList.add("over"); }));
 ["dragleave","drop"].forEach(t => dropEl.addEventListener(t, e => { e.preventDefault(); dropEl.classList.remove("over"); }));
 dropEl.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if(f) readPic(f); });
+/* pasting a Google Doc: keep headings, bold, lists and pictures, drop everything else */
+function cleanPaste(html){
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const out = document.createElement("div");
+  const BLOCK = {P:"p", DIV:"p", H1:"h3", H2:"h3", H3:"h4", H4:"h4", H5:"h4", H6:"h4", UL:"ul", OL:"ol", LI:"li", TR:"p"};
+  (function walk(node, parent){
+    for(const n of node.childNodes){
+      if(n.nodeType === 3){ parent.append(n.textContent); continue; }
+      if(n.nodeType !== 1 || /^(STYLE|SCRIPT|META|TITLE|HEAD)$/.test(n.tagName)) continue;
+      const t = n.tagName, st = (n.getAttribute("style")||"").toLowerCase();
+      if(t === "BR"){ parent.append(document.createElement("br")); continue; }
+      if(t === "IMG"){ const s = n.getAttribute("src")||""; if(/^https:\/\//.test(s) || /^data:image\//.test(s)){ const im = document.createElement("img"); im.src = s; parent.append(im); } continue; }
+      let target = parent;
+      if(BLOCK[t]){ target = document.createElement(BLOCK[t]); parent.append(target); }
+      const bold = /font-weight:\s*(bold|[6-9]00)/.test(st) || ((t==="B"||t==="STRONG") && !/font-weight:\s*(normal|[1-4]00)/.test(st));
+      const ital = /font-style:\s*italic/.test(st) || t==="I" || t==="EM";
+      const und = /text-decoration[^;]*underline/.test(st) || t==="U";
+      for(const [on, tag] of [[bold,"b"],[ital,"i"],[und,"u"]]) if(on){ const w = document.createElement(tag); target.append(w); target = w; }
+      walk(n, target);
+    }
+  })(doc.body, out);
+  out.querySelectorAll("p").forEach(p => { if(!p.textContent.trim() && !p.querySelector("img")) p.replaceWith(document.createElement("br")); });
+  return out.innerHTML;
+}
+$("postBody").addEventListener("paste", e => {
+  const cd = e.clipboardData; if(!cd) return;
+  const html = cd.getData("text/html");
+  if(html){ e.preventDefault(); e.stopPropagation(); document.execCommand("insertHTML", false, cleanPaste(html)); return; }
+  const text = cd.getData("text/plain");
+  if(text){ e.preventDefault(); e.stopPropagation(); document.execCommand("insertText", false, text); }
+});
+
+/* voting */
+function pollEl(pid, p){
+  const box = document.createElement("div"); box.className = "poll";
+  const v = votes[pid] || {}, counts = p.options.map(()=>0);
+  Object.values(v).forEach(n => { if(counts[n] !== undefined) counts[n]++; });
+  const total = counts.reduce((a,b)=>a+b,0), mine = boys[me] ? v[me] : undefined, voted = mine !== undefined;
+  p.options.forEach((o,i)=>{
+    const b = document.createElement("button"); b.className = "opt" + (mine===i ? " mine" : "");
+    const pc = total ? Math.round(counts[i]/total*100) : 0;
+    b.innerHTML = `<span class="fill"></span><span class="t"></span><span class="n"></span>`;
+    b.querySelector(".t").textContent = (mine===i ? "✓ " : "") + o;
+    if(voted || isAdmin){ b.querySelector(".fill").style.width = pc + "%"; b.querySelector(".n").textContent = `${counts[i]} · ${pc}%`; }
+    b.disabled = !boys[me];
+    b.onclick = async () => { if(await api("vote", {postId:pid, boyId:me, choice:i})) toast(voted ? "Vote changed" : "Voted! 🗳️"); };
+    box.append(b);
+  });
+  const n = document.createElement("p"); n.className = "note";
+  n.textContent = voted ? `${total} vote${total===1?"":"s"} · tap another answer to change your vote` : (boys[me] ? "Tap an answer to vote. You'll see the results after." : "Put your name in to vote.");
+  box.append(n);
+  return box;
+}
+
 $("postBox").addEventListener("paste", e => {
   const f = [...(e.clipboardData?.items||[])].find(i => i.type.startsWith("image/"))?.getAsFile();
   if(f){ e.preventDefault(); readPic(f); }

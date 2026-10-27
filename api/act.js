@@ -1,4 +1,5 @@
 import { redis, getState, isAdmin, weekKey, RULES, PARTS, WEEK_MAX, BONUS } from "../lib/shared.js";
+import { cleanHtml, imgSrcs } from "../lib/clean.js";
 
 const id = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 class Oops extends Error {}
@@ -35,6 +36,14 @@ export default async function handler(req, res) {
         const l = s.leins[b.leinId];
         if (!l || l.boyId !== b.boyId || l.awarded) no("You can't remove that one.");
         await redis.hdel("leins", b.leinId);
+        break;
+      }
+      case "vote": {
+        boy(b.boyId);
+        const p = s.posts[b.postId] || no("That vote isn't there anymore.");
+        const n = Number(b.choice);
+        if (!Number.isInteger(n) || n < 0 || n >= (p.options || []).length) no("Pick an answer.");
+        await redis.hset("v:" + b.postId, { [b.boyId]: n });
         break;
       }
       case "checkCode": {
@@ -82,8 +91,10 @@ export default async function handler(req, res) {
             const kind = kinds.includes(b.kind) ? b.kind : "news";
             const title = String(b.title || "").trim().slice(0, 80);
             const body = String(b.body || "").trim().slice(0, 3000);
-            let link = String(b.link || "").trim().slice(0, 500);
-            if (link && !/^https?:\/\//i.test(link)) link = "https://" + link;
+            const link = "";
+            const options = (Array.isArray(b.options) ? b.options : []).map(o => String(o || "").trim().slice(0, 60)).filter(Boolean).slice(0, 8);
+            if (options.length === 1) no("A vote needs at least 2 answers.");
+            let html = cleanHtml(String(b.html || "").slice(0, 60000)).slice(0, 40000);
             const img = typeof b.image === "string" ? b.image : "";
             if (img && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > 900000)) no("That picture is too big or not a picture. Try a smaller one.");
             const when = /^\d{4}-\d{2}-\d{2}$/.test(b.when || "") ? b.when : "";
@@ -91,13 +102,33 @@ export default async function handler(req, res) {
             if (Object.keys(s.posts).length >= 100) no("Too many posts. Delete some old ones first.");
             const pid = id();
             if (img) await redis.hset("img", { [pid]: img });
-            await redis.hset("posts", { [pid]: { kind, title, body, when, link, hasImg: !!img, at: Date.now() } });
+            // copy pictures from the pasted Google Doc so they keep working
+            let n = 0;
+            for (const src of imgSrcs(html).slice(0, 10)) {
+              const key = pid + "x" + (n++);
+              let local = "";
+              try {
+                if (src.startsWith("data:image/") && src.length < 900000) local = src;
+                else if (src.startsWith("https://")) {
+                  const r = await fetch(src);
+                  const type = (r.headers.get("content-type") || "").split(";")[0];
+                  const buf = Buffer.from(await r.arrayBuffer());
+                  if (r.ok && /^image\/(png|jpeg|webp)$/.test(type) && buf.length < 650000) local = `data:${type};base64,${buf.toString("base64")}`;
+                }
+              } catch (e) {}
+              const safe = src.replace(/&/g, "&amp;");
+              if (local) { await redis.hset("img", { [key]: local }); html = html.split(`src="${safe}"`).join(`src="/api/img?id=${key}"`); }
+              else if (src.startsWith("data:")) html = html.split(`<img src="${safe}" alt="">`).join("");
+            }
+            await redis.hset("posts", { [pid]: { kind, title, body: html ? "" : body, html, when, link, options, hasImg: !!img, imgs: n, at: Date.now() } });
             break;
           }
           case "deletePost": {
             if (!s.posts[b.postId]) no("That post isn't there anymore.");
+            const old = s.posts[b.postId];
             await redis.hdel("posts", b.postId);
-            await redis.hdel("img", b.postId);
+            await redis.hdel("img", b.postId, ...Array.from({ length: old.imgs || 0 }, (_, i) => b.postId + "x" + i));
+            await redis.del("v:" + b.postId);
             break;
           }
           default: no("Unknown action.");
