@@ -249,6 +249,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
       <p class="note" style="margin:-4px 0 0">Your <b>password</b> is your secret, at least 4 characters. Don't tell anyone, and remember it!</p>
       <button class="primary" type="submit">Set up my login</button>
     </form>
+    <button type="button" id="adminLogin" class="ghost" style="align-self:center">🔒 Admin log in</button>
   </div>
 </div>
 
@@ -704,7 +705,8 @@ $("codeGo").onclick = async () => {
   else adminCode = old;
 };
 $("codeIn").onkeydown = e => { if(e.key==="Enter") $("codeGo").click(); };
-$("lockBtn").onclick = () => { lockAdmin(); toast("Left admin"); };
+$("lockBtn").onclick = () => { lockAdmin(); toast("Left admin"); if(!boys[me]) $("adminBack").click(); };
+$("adminLogin").onclick = () => { location.hash = "admin"; setTimeout(() => $("codeIn").focus(), 50); };
 
 render();
 load().then(async () => {
@@ -769,7 +771,8 @@ function renderNews(){
     list.forEach(([id,p])=>{
       const li = document.createElement("li");
       li.innerHTML = `<span></span>`;
-      li.firstChild.textContent = `${(KINDS[p.kind]||"").split(" ")[0]} ${p.title}`;
+      const res = (p.options||[]).length > 1 ? "  🗳️ " + p.options.map((o,i)=>`${o}: ${(votes[id]||[])[i]||0}`).join(" · ") : "";
+      li.firstChild.textContent = `${(KINDS[p.kind]||"").split(" ")[0]} ${p.title}${res}`;
       const b = document.createElement("button"); b.textContent = "Delete";
       b.onclick = async () => { if(!confirm(`Delete "${p.title}"?`)) return; if(await api("deletePost",{postId:id})) toast("Post deleted"); };
       li.append(b); mine.append(li);
