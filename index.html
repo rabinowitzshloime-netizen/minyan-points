@@ -227,22 +227,26 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
       <button role="tab" data-mode="claim" id="claimTab">I'm on the list</button>
     </div>
     <form class="auth" data-panel-mode="login" id="loginForm">
-      <input id="liUser" placeholder="Username" autocomplete="username" autocapitalize="none" aria-label="Username">
+      <input id="liUser" placeholder="Username (the nickname you log in with)" autocomplete="username" autocapitalize="none" aria-label="Username">
       <input id="liPass" type="password" placeholder="Password" autocomplete="current-password" aria-label="Password">
       <button class="primary" type="submit">Log in</button>
       <p class="note" style="margin:0">Forgot your password? Ask the admin to reset it.</p>
     </form>
     <form class="auth" data-panel-mode="signup" id="signupForm" hidden>
       <input id="suName" placeholder="Your name (what everyone sees)" maxlength="30" aria-label="Your name">
-      <input id="suUser" placeholder="Pick a username" maxlength="20" autocomplete="username" autocapitalize="none" aria-label="Username">
+      <input id="suUser" placeholder="Pick a username, e.g. shloime123" maxlength="20" autocomplete="username" autocapitalize="none" aria-label="Username">
+      <p class="note hint" style="margin:-4px 0 0">A <b>username</b> is a nickname you log in with, like <b>shloime123</b>. Only you use it. Everyone else sees your real name. 3 to 20 letters or numbers, no spaces.</p>
       <input id="suPass" type="password" placeholder="Pick a password" autocomplete="new-password" aria-label="Password">
+      <p class="note" style="margin:-4px 0 0">Your <b>password</b> is your secret, at least 4 characters. Don't tell anyone, and remember it!</p>
       <button class="primary" type="submit">Sign up</button>
     </form>
     <form class="auth" data-panel-mode="claim" id="claimForm" hidden>
       <p class="note" style="margin:0">Your name is already on the list? Pick it and make a username and password. You only do this once.</p>
       <select id="clPick" aria-label="Your name"></select>
-      <input id="clUser" placeholder="Pick a username" maxlength="20" autocomplete="username" autocapitalize="none" aria-label="Username">
+      <input id="clUser" placeholder="Pick a username, e.g. shloime123" maxlength="20" autocomplete="username" autocapitalize="none" aria-label="Username">
+      <p class="note hint" style="margin:-4px 0 0">A <b>username</b> is a nickname you log in with, like <b>shloime123</b>. Only you use it. Everyone else sees your real name. 3 to 20 letters or numbers, no spaces.</p>
       <input id="clPass" type="password" placeholder="Pick a password" autocomplete="new-password" aria-label="Password">
+      <p class="note" style="margin:-4px 0 0">Your <b>password</b> is your secret, at least 4 characters. Don't tell anyone, and remember it!</p>
       <button class="primary" type="submit">Set up my login</button>
     </form>
   </div>
