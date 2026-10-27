@@ -1,4 +1,4 @@
-import { redis, getState, isAdmin, weekKey, RULES, PARTS, WEEK_MAX, BONUS } from "../lib/shared.js";
+import { redis, getState, isAdmin, weekKey, RULES, PARTS, WEEK_MAX, BONUS, publicState, sessionUser, newSession, hashPw, checkPw, cleanUser, USER_OK } from "../lib/shared.js";
 import { cleanHtml, imgSrcs } from "../lib/clean.js";
 
 const id = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -12,19 +12,68 @@ export default async function handler(req, res) {
   try {
     const s = await getState();
     const boy = bid => s.boys[bid] || no("That name isn't on the list.");
+    let me = await sessionUser(b.token, s.boys);
+    const mustLogIn = () => me || no("Please log in again.");
+    const checkNew = async () => {
+      const username = cleanUser(b.username), password = String(b.password || "");
+      if (!USER_OK.test(username)) no("Usernames need 3 to 20 letters or numbers, no spaces.");
+      if (password.length < 4) no("Make your password at least 4 characters.");
+      if (password.length > 64) no("That password is too long.");
+      return { username, password };
+    };
+    const takeName = async (username, bid) => {
+      const ok = await redis.hsetnx("unames", username, bid);
+      if (!ok) no("Someone already has that username. Try another one.");
+    };
 
     switch (b.action) {
       /* ----- anyone ----- */
-      case "addBoy": {
+      case "signup": {
         const name = String(b.name || "").trim().slice(0, 30);
         if (!name) no("Type your name first.");
         if (Object.keys(s.boys).length >= 300) no("The list is full. Ask the admin.");
-        out.id = id();
-        await redis.hset("boys", { [out.id]: { name } });
+        const { username, password } = await checkNew();
+        const bid = id();
+        await takeName(username, bid);
+        const rec = { name, username, pw: hashPw(password), ver: 0 };
+        await redis.hset("boys", { [bid]: rec });
+        s.boys[bid] = rec;
+        out.token = await newSession(bid, rec); me = bid;
+        break;
+      }
+      case "claim": {
+        const old = boy(b.boyId);
+        if (old.pw) no("That name already has a login. Ask the admin if it's yours.");
+        const { username, password } = await checkNew();
+        await takeName(username, b.boyId);
+        const rec = { ...old, username, pw: hashPw(password), ver: (old.ver || 0) + 1 };
+        await redis.hset("boys", { [b.boyId]: rec });
+        s.boys[b.boyId] = rec;
+        out.token = await newSession(b.boyId, rec); me = b.boyId;
+        break;
+      }
+      case "login": {
+        const username = cleanUser(b.username);
+        const failKey = "fail:" + username;
+        const fails = Number(await redis.get(failKey)) || 0;
+        if (fails >= 10) no("Too many wrong tries. Wait 15 minutes, or ask the admin.");
+        const bid = await redis.hget("unames", username);
+        const rec = bid && s.boys[bid];
+        if (!rec || !checkPw(b.password || "", rec.pw)) {
+          await redis.incr(failKey); await redis.expire(failKey, 900);
+          no("Wrong username or password.");
+        }
+        await redis.del(failKey);
+        out.token = await newSession(bid, rec); me = bid;
+        break;
+      }
+      case "logout": {
+        if (typeof b.token === "string" && /^[a-f0-9]{64}$/.test(b.token)) await redis.del("s:" + b.token);
+        me = null;
         break;
       }
       case "signLein": {
-        boy(b.boyId);
+        b.boyId = mustLogIn();
         if (!PARTS.includes(b.part)) no("Pick a part.");
         const parsha = String(b.parsha || "").slice(0, 40);
         const taken = Object.values(s.leins).some(l => l.parsha === parsha && l.part === b.part);
@@ -33,13 +82,14 @@ export default async function handler(req, res) {
         break;
       }
       case "dropLein": {
+        b.boyId = mustLogIn();
         const l = s.leins[b.leinId];
         if (!l || l.boyId !== b.boyId || l.awarded) no("You can't remove that one.");
         await redis.hdel("leins", b.leinId);
         break;
       }
       case "vote": {
-        boy(b.boyId);
+        b.boyId = mustLogIn();
         const p = s.posts[b.postId] || no("That vote isn't there anymore.");
         const n = Number(b.choice);
         if (!Number.isInteger(n) || n < 0 || n >= (p.options || []).length) no("Pick an answer.");
@@ -77,8 +127,15 @@ export default async function handler(req, res) {
           case "bonus": { boy(b.boyId); const r = rec(b.boyId); await redis.hset("pts", { [b.boyId]: { ...r, points: (r.points || 0) + BONUS } }); break; }
           case "minus": { boy(b.boyId); const r = rec(b.boyId); if (!r.points) no("They have 0 points."); await redis.hset("pts", { [b.boyId]: { ...r, points: r.points - 1 } }); break; }
           case "markGiven": { boy(b.boyId); const r = rec(b.boyId); await redis.hset("pts", { [b.boyId]: { ...r, given: (r.given || 0) + 1 } }); break; }
+          case "resetLogin": {
+            const old = boy(b.boyId);
+            if (old.username) await redis.hdel("unames", old.username);
+            await redis.hset("boys", { [b.boyId]: { name: old.name, ver: (old.ver || 0) + 1 } });
+            break;
+          }
           case "removeBoy": {
-            boy(b.boyId);
+            const old = boy(b.boyId);
+            if (old.username) await redis.hdel("unames", old.username);
             await redis.hdel("boys", b.boyId);
             await redis.hdel("pts", b.boyId);
             const mine = Object.keys(s.leins).filter(k => s.leins[k].boyId === b.boyId);
@@ -135,7 +192,7 @@ export default async function handler(req, res) {
         }
       }
     }
-    out.state = await getState();
+    out.state = publicState(await getState(), me, isAdmin(b.code));
     res.status(200).json(out);
   } catch (e) {
     if (e instanceof Oops) return res.status(400).json({ error: e.message });

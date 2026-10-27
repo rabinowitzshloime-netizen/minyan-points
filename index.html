@@ -196,6 +196,11 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .opt.mine{border-color:var(--ice);font-weight:700}
 .opt .n{font-variant-numeric:tabular-nums;color:var(--ice);font-weight:700;white-space:nowrap}
 .poll .note{margin:0}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg button{padding:8px 4px;font-size:13px;color:var(--muted);background:var(--black)}
+.seg button[aria-selected="true"]{color:var(--black);background:var(--ice);border-color:var(--ice);font-weight:700}
+.auth{display:flex;flex-direction:column;gap:10px}
+.auth input,.auth select{font-size:16px;padding:12px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -216,13 +221,30 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
     <img src="/logo.png" class="logo-big" alt="Lubavitch Boys Minyan logo" width="150" height="150">
     <div class="heb">ברוכים הבאים</div>
     <h1>Minyan <span>Points</span></h1>
-    <p style="margin:0;color:var(--muted)">Welcome! Type your name to start.</p>
-    <input id="newName" placeholder="Your name" maxlength="30" aria-label="Your name" autocomplete="off">
-    <button id="addBtn" class="primary">Start</button>
-    <div id="existingWrap" hidden style="display:flex;flex-direction:column;gap:8px">
-      <div class="label">Already on the list?</div>
-      <select id="pick" aria-label="Pick your name"></select>
+    <div class="seg" role="tablist" aria-label="Log in or sign up">
+      <button role="tab" data-mode="login">Log in</button>
+      <button role="tab" data-mode="signup">Sign up</button>
+      <button role="tab" data-mode="claim" id="claimTab">I'm on the list</button>
     </div>
+    <form class="auth" data-panel-mode="login" id="loginForm">
+      <input id="liUser" placeholder="Username" autocomplete="username" autocapitalize="none" aria-label="Username">
+      <input id="liPass" type="password" placeholder="Password" autocomplete="current-password" aria-label="Password">
+      <button class="primary" type="submit">Log in</button>
+      <p class="note" style="margin:0">Forgot your password? Ask the admin to reset it.</p>
+    </form>
+    <form class="auth" data-panel-mode="signup" id="signupForm" hidden>
+      <input id="suName" placeholder="Your name (what everyone sees)" maxlength="30" aria-label="Your name">
+      <input id="suUser" placeholder="Pick a username" maxlength="20" autocomplete="username" autocapitalize="none" aria-label="Username">
+      <input id="suPass" type="password" placeholder="Pick a password" autocomplete="new-password" aria-label="Password">
+      <button class="primary" type="submit">Sign up</button>
+    </form>
+    <form class="auth" data-panel-mode="claim" id="claimForm" hidden>
+      <p class="note" style="margin:0">Your name is already on the list? Pick it and make a username and password. You only do this once.</p>
+      <select id="clPick" aria-label="Your name"></select>
+      <input id="clUser" placeholder="Pick a username" maxlength="20" autocomplete="username" autocapitalize="none" aria-label="Username">
+      <input id="clPass" type="password" placeholder="Pick a password" autocomplete="new-password" aria-label="Password">
+      <button class="primary" type="submit">Set up my login</button>
+    </form>
   </div>
 </div>
 
@@ -261,7 +283,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
         <div class="label">Shalom</div>
         <h2 id="hi">Hi, <span id="myName"></span></h2>
       </div>
-      <button id="switchBtn">Not you?</button>
+      <button id="switchBtn">Log out</button>
     </div>
     <div class="score">
       <span class="big" id="myPts">0</span>
@@ -342,6 +364,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
     </div>
     <div class="row">
       <select id="givePick" class="grow" aria-label="Choose a boy"></select>
+      <button id="resetBtn" title="Use this if a boy forgets his password">Reset login</button>
       <button id="removeBtn">Remove name</button>
     </div>
     <p class="note" id="shabbosFor" style="margin:0;color:var(--ice-soft)"></p>
@@ -424,24 +447,25 @@ const DEFAULT_PARSHA = "Vayera"; // Shabbos 31 Oct 2026
 const $ = id => document.getElementById(id);
 let boys = {}, pts = {}, leins = {}, week = "";
 let loaded = false;
-let me = null, adminCode = "";
-try { me = localStorage.getItem("mp_me"); adminCode = localStorage.getItem("mp_code") || ""; } catch(e){}
+let me = null, adminCode = "", tok = "";
+try { tok = localStorage.getItem("mp_tok") || ""; adminCode = localStorage.getItem("mp_code") || ""; localStorage.removeItem("mp_me"); } catch(e){}
 let isAdmin = false;
 
 /* ---------- talking to the server ---------- */
-let posts = {}, votes = {};
-function apply(s){ boys = s.boys||{}; pts = s.pts||{}; leins = s.leins||{}; posts = s.posts||{}; votes = s.votes||{}; week = s.week||""; loaded = true; render(); }
+let posts = {}, votes = {}, myVotes = {};
+function apply(s){ boys = s.boys||{}; pts = s.pts||{}; leins = s.leins||{}; posts = s.posts||{}; votes = s.votes||{}; myVotes = s.myVotes||{}; me = s.me||null; if(!me && tok){ tok = ""; try{ localStorage.removeItem("mp_tok"); }catch(e){} } week = s.week||""; loaded = true; render(); }
 async function load(){
-  try{ const r = await fetch("/api/state", {cache:"no-store"}); if(r.ok) apply(await r.json()); }
+  try{ const r = await fetch("/api/state", {cache:"no-store", headers:{"x-token":tok, "x-code":adminCode}}); if(r.ok) apply(await r.json()); }
   catch(e){}
 }
 async function api(action, data = {}){
   let r, j = {};
   try{
-    r = await fetch("/api/act", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action, code: adminCode, ...data})});
+    r = await fetch("/api/act", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action, code: adminCode, token: tok, ...data})});
     j = await r.json().catch(()=>({}));
   }catch(e){ toast("No internet. Try again."); return null; }
   if(!r.ok){ toast(j.error || "Couldn't save. Try again."); if(r.status===401) lockAdmin(); return null; }
+  if(j.token){ tok = j.token; try{ localStorage.setItem("mp_tok", tok); }catch(e){} }
   if(j.state) apply(j.state);
   return j;
 }
@@ -492,11 +516,15 @@ function render(){
   $("adminPage").hidden = !adminView;
   $("welcome").hidden = !loaded || signedIn || adminView;
   $("main").hidden = !loaded || !signedIn || adminView;
-  const pick = $("pick");
+  const unclaimed = ids.filter(id => !boys[id].claimed);
+  const pick = $("clPick"), keepPick = pick.value;
   pick.innerHTML = "";
   pick.add(new Option("Choose your name…", ""));
-  ids.forEach(id => pick.add(new Option(boys[id].name, id)));
-  $("existingWrap").hidden = !ids.length;
+  unclaimed.forEach(id => pick.add(new Option(boys[id].name, id)));
+  pick.value = boys[keepPick] ? keepPick : "";
+  $("claimTab").hidden = !unclaimed.length;
+  if(!unclaimed.length && authMode === "claim") setMode("login");
+  $("resetBtn").disabled = !$("givePick").value || !boys[$("givePick").value]?.claimed;
 
   if(signedIn){
     $("myName").textContent = boys[me].name;
@@ -529,7 +557,7 @@ function render(){
   if(isAdmin){
     const gp = $("givePick"), keep = gp.value;
     gp.innerHTML = ""; gp.add(new Option(ids.length ? "Choose a boy…" : "No names yet", ""));
-    ids.forEach(id => gp.add(new Option(`${boys[id].name} · ${pointsOf(id)} pts · ${weekOf(id)}/${WEEK_MAX} this Shabbos`, id)));
+    ids.forEach(id => gp.add(new Option(`${boys[id].name}${boys[id].username ? " (@"+boys[id].username+")" : " (no login yet)"} · ${pointsOf(id)} pts · ${weekOf(id)}/${WEEK_MAX} this Shabbos`, id)));
     gp.value = boys[keep] ? keep : "";
     const sel = gp.value, full = sel && weekOf(sel) >= WEEK_MAX, done = sel ? doneOf(sel) : [];
     $("shabbosFor").textContent = `Giving points for Shabbos ${shabbosLabel()}`;
@@ -592,8 +620,8 @@ function render(){
     b.querySelector("small").textContent = t ? (t.boyId===me ? (t.awarded?"You leined it ✓":"You're saying this") : (boys[t.boyId]?.name||"Taken")) : "+1 point";
     b.disabled = !boys[me] || (t && t.boyId!==me) || (t && t.awarded);
     b.onclick = async () => {
-      if(t && t.boyId===me){ if(await api("dropLein", {leinId:takenId, boyId:me})) toast("Removed"); return; }
-      if(await api("signLein", {boyId:me, parsha, part:p.k})) toast(`You're saying ${p.t}`);
+      if(t && t.boyId===me){ if(await api("dropLein", {leinId:takenId})) toast("Removed"); return; }
+      if(await api("signLein", {parsha, part:p.k})) toast(`You're saying ${p.t}`);
     };
     parts.append(b);
   });
@@ -635,18 +663,32 @@ $("removeBtn").onclick = async () => {
   if(!confirm(`Remove ${name} and all their points?`)) return;
   if(await api("removeBoy", {boyId:id})) toast(`Removed ${name}`);
 };
-$("pick").onchange = e => { if(!e.target.value) return; me = e.target.value; try{ localStorage.setItem("mp_me", me); }catch(x){} render(); window.scrollTo(0,0); };
-$("switchBtn").onclick = () => { me = null; try{ localStorage.removeItem("mp_me"); }catch(x){} render(); };
-$("addBtn").onclick = async () => {
-  const name = $("newName").value.trim();
-  if(!name){ toast("Type your name first"); return; }
-  const j = await api("addBoy", {name});
-  if(!j) return;
-  me = j.id; try{ localStorage.setItem("mp_me", me); }catch(x){}
-  $("newName").value = "";
-  render(); toast(`Welcome, ${name}!`);
+/* ---------- log in / sign up ---------- */
+var authMode = "login";
+function setMode(m){
+  authMode = m;
+  document.querySelectorAll(".seg [data-mode]").forEach(b => b.setAttribute("aria-selected", b.dataset.mode === m));
+  document.querySelectorAll("[data-panel-mode]").forEach(f => f.hidden = f.dataset.panelMode !== m);
+}
+document.querySelectorAll(".seg [data-mode]").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+setMode("login");
+function loggedIn(j, msg){ if(!j) return; document.querySelectorAll(".auth input").forEach(i => i.value = ""); window.scrollTo(0,0); toast(msg); }
+$("loginForm").onsubmit = async e => { e.preventDefault();
+  const u = $("liUser").value.trim(), p = $("liPass").value;
+  if(!u || !p){ toast("Type your username and password"); return; }
+  const j = await api("login", {username:u, password:p}); if(j) loggedIn(j, `Welcome back, ${boys[me]?.name || ""}!`); };
+$("signupForm").onsubmit = async e => { e.preventDefault();
+  const n = $("suName").value.trim(); if(!n){ toast("Type your name"); return; }
+  loggedIn(await api("signup", {name:n, username:$("suUser").value, password:$("suPass").value}), `Welcome, ${n}! 🎉`); };
+$("claimForm").onsubmit = async e => { e.preventDefault();
+  const id = $("clPick").value; if(!id){ toast("Choose your name"); return; }
+  loggedIn(await api("claim", {boyId:id, username:$("clUser").value, password:$("clPass").value}), "You're all set up! 🎉"); };
+$("switchBtn").onclick = async () => { await api("logout"); tok = ""; me = null; try{ localStorage.removeItem("mp_tok"); }catch(x){} render(); toast("Logged out"); };
+$("resetBtn").onclick = async () => {
+  const id = $("givePick").value; if(!boys[id]) return;
+  if(!confirm(`Reset ${boys[id].name}'s login? He'll pick a new username and password with "I'm on the list".`)) return;
+  if(await api("resetLogin", {boyId:id})) toast(`${boys[id].name} can set up his login again`);
 };
-$("newName").onkeydown = e => { if(e.key==="Enter") $("addBtn").click(); };
 $("adminOpen").onclick = () => { location.hash = "admin"; };
 $("adminBack").onclick = () => { try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){ location.hash = ""; } render(); window.scrollTo(0,0); };
 window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); });
@@ -654,7 +696,7 @@ $("codeGo").onclick = async () => {
   const v = $("codeIn").value.trim(); if(!v) return;
   $("codeIn").value = "";
   const old = adminCode; adminCode = v;
-  if(await api("checkCode")){ isAdmin = true; try{ localStorage.setItem("mp_code", v); }catch(e){} render(); toast("You're the admin now"); }
+  if(await api("checkCode")){ isAdmin = true; try{ localStorage.setItem("mp_code", v); }catch(e){} render(); toast("You're the admin now"); load(); }
   else adminCode = old;
 };
 $("codeIn").onkeydown = e => { if(e.key==="Enter") $("codeGo").click(); };
@@ -663,7 +705,7 @@ $("lockBtn").onclick = () => { lockAdmin(); toast("Left admin"); };
 render();
 load().then(async () => {
   if(adminCode){ const j = await fetch("/api/act",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"checkCode",code:adminCode})}).catch(()=>null);
-    if(j && j.ok){ isAdmin = true; render(); } else if(j && j.status===400) lockAdmin(); }
+    if(j && j.ok){ isAdmin = true; load(); } else if(j && j.status===400) lockAdmin(); }
 });
 setInterval(() => { if(!document.hidden) load(); }, 15000);
 document.addEventListener("visibilitychange", () => { if(!document.hidden) load(); });
@@ -805,9 +847,8 @@ $("postBody").addEventListener("paste", e => {
 /* voting */
 function pollEl(pid, p){
   const box = document.createElement("div"); box.className = "poll";
-  const v = votes[pid] || {}, counts = p.options.map(()=>0);
-  Object.values(v).forEach(n => { if(counts[n] !== undefined) counts[n]++; });
-  const total = counts.reduce((a,b)=>a+b,0), mine = boys[me] ? v[me] : undefined, voted = mine !== undefined;
+  const counts = p.options.map((_,i) => (votes[pid]||[])[i] || 0);
+  const total = counts.reduce((a,b)=>a+b,0), mine = boys[me] ? myVotes[pid] : undefined, voted = mine !== undefined;
   p.options.forEach((o,i)=>{
     const b = document.createElement("button"); b.className = "opt" + (mine===i ? " mine" : "");
     const pc = total ? Math.round(counts[i]/total*100) : 0;
@@ -815,11 +856,11 @@ function pollEl(pid, p){
     b.querySelector(".t").textContent = (mine===i ? "✓ " : "") + o;
     if(voted || isAdmin){ b.querySelector(".fill").style.width = pc + "%"; b.querySelector(".n").textContent = `${counts[i]} · ${pc}%`; }
     b.disabled = !boys[me];
-    b.onclick = async () => { if(await api("vote", {postId:pid, boyId:me, choice:i})) toast(voted ? "Vote changed" : "Voted! 🗳️"); };
+    b.onclick = async () => { if(await api("vote", {postId:pid, choice:i})) toast(voted ? "Vote changed" : "Voted! 🗳️"); };
     box.append(b);
   });
   const n = document.createElement("p"); n.className = "note";
-  n.textContent = voted ? `${total} vote${total===1?"":"s"} · tap another answer to change your vote` : (boys[me] ? "Tap an answer to vote. You'll see the results after." : "Put your name in to vote.");
+  n.textContent = voted ? `${total} vote${total===1?"":"s"} · tap another answer to change your vote` : (boys[me] ? "Tap an answer to vote. You'll see the results after." : "Log in to vote.");
   box.append(n);
   return box;
 }
