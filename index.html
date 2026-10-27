@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#16306e">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Minyan Points</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Frank+Ruhl+Libre:wght@500;700;900&family=Rubik:wght@400;500;700&display=swap">
@@ -86,6 +88,10 @@ ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px
 section.admin{border-color:var(--ice);background:linear-gradient(180deg,var(--navy-2),var(--navy))}
 .admin-chip{color:var(--ice);border-color:var(--ice)}
 .earn .info{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:10px;background:var(--black);border:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:14px;min-width:0}
+.logo{width:84px;height:84px;flex:none;filter:drop-shadow(0 4px 10px rgba(5,10,30,.6))}
+.logo-big{width:150px;height:150px;align-self:center;filter:drop-shadow(0 6px 14px rgba(5,10,30,.6))}
+@media (max-width:420px){.logo{width:64px;height:64px}}
 .top-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .welcome{min-height:calc(100vh - 72px);display:grid;place-items:center}
 .welcome-card{width:100%;max-width:400px;display:flex;flex-direction:column;gap:14px;background:var(--navy);border:1px solid var(--ice);border-radius:18px;padding:24px;box-shadow:0 0 60px rgba(127,212,255,.12)}
@@ -144,11 +150,28 @@ button.ghost{border:2px dashed var(--line)}
 .prize .bar::before{content:"";position:absolute;inset:0;background:var(--black);border-radius:99px 30px 99px 30px;filter:url(#rough)}
 .prize .bar span{position:relative;height:100%;border-radius:99px 30px 99px 30px;filter:url(#rough)}
 .toast{border-radius:255px 14px 225px 14px/14px 225px 14px 255px;font-family:var(--display);font-weight:400;font-size:20px}
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;position:relative;z-index:1}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;position:relative;z-index:1}
 .tabs button{padding:10px 6px;font-size:13px;font-weight:500;color:var(--muted);background:var(--black);line-height:1.2}
 .tabs button[aria-selected="true"]{position:relative;isolation:isolate;color:var(--black);background:transparent;border-color:transparent;font-weight:700}
 .tabs button[aria-selected="true"]::before{content:"";position:absolute;inset:-2px;z-index:-1;background:var(--ice);border-radius:inherit;filter:url(#rough)}
-@media (max-width:420px){.tabs button{font-size:12px;padding:10px 4px}}
+@media (max-width:420px){.tabs button{font-size:11px;padding:10px 2px}}
+.tabs button{position:relative}
+.badge{position:absolute;top:-8px;right:-6px;min-width:22px;height:22px;padding:0 6px;border-radius:99px;background:#ff5a7a;color:#fff;font-size:12px;font-weight:700;line-height:22px;text-align:center;font-family:var(--body);box-shadow:0 2px 8px rgba(0,0,0,.4);z-index:2}
+.banner{position:relative;z-index:1;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;border:2px solid var(--ice);background:var(--navy-2);border-radius:255px 14px 225px 14px/14px 225px 14px 255px;animation:pop .4s ease-out}
+.banner b{font-family:var(--display);font-weight:400;font-size:22px;color:var(--ice-soft)}
+.banner .grow{min-width:0;overflow-wrap:anywhere}
+@keyframes pop{from{transform:scale(.96);opacity:.6}to{transform:none;opacity:1}}
+.posts{display:flex;flex-direction:column;gap:12px}
+.post{display:flex;flex-direction:column;gap:6px;padding:14px 16px;background:var(--black);border:2px solid var(--line);border-radius:255px 14px 225px 14px/14px 225px 14px 255px}
+.post.unread{border-color:var(--ice)}
+.post h3{margin:0;font-family:var(--display);font-weight:400;font-size:24px;line-height:1.15;overflow-wrap:anywhere}
+.post p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.post .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
+.kind{font-size:12px;font-weight:700;padding:2px 10px;border-radius:99px;background:var(--navy-2);color:var(--ice)}
+.kind.important{background:#ff5a7a;color:#fff}
+.when{color:var(--ice-soft);font-weight:500}
+textarea{font:inherit;color:var(--text);background:var(--black);border:2px solid var(--line);border-radius:14px;padding:10px 12px;min-height:90px;resize:vertical;width:100%}
+textarea:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -166,6 +189,7 @@ button.ghost{border:2px dashed var(--line)}
 
 <div class="welcome" id="welcome" hidden>
   <div class="welcome-card">
+    <img src="/logo.png" class="logo-big" alt="Lubavitch Boys Minyan logo" width="150" height="150">
     <div class="heb">ברוכים הבאים</div>
     <h1>Minyan <span>Points</span></h1>
     <p style="margin:0;color:var(--muted)">Welcome! Type your name to start.</p>
@@ -180,9 +204,12 @@ button.ghost{border:2px dashed var(--line)}
 
 <div class="wrap" id="main" hidden>
   <header>
-    <div>
-      <div class="label">Boys minyan</div>
-      <h1>Minyan <span>Points</span></h1>
+    <div class="brand">
+      <img src="/logo.png" class="logo" alt="Lubavitch Boys Minyan logo" width="84" height="84">
+      <div>
+        <div class="label">Lubavitch Boys Minyan</div>
+        <h1>Minyan <span>Points</span></h1>
+      </div>
     </div>
     <div class="top-right">
       <div class="heb">בס״ד</div>
@@ -194,7 +221,15 @@ button.ghost{border:2px dashed var(--line)}
     <button role="tab" data-tab="me">⭐ My Points</button>
     <button role="tab" data-tab="lein">📖 Leining</button>
     <button role="tab" data-tab="board">🏆 Leaderboard</button>
+    <button role="tab" data-tab="news">📢 News<span class="badge" id="newsBadge" hidden></span></button>
   </nav>
+
+  <div class="banner" id="banner" hidden>
+    <span style="font-size:26px" aria-hidden="true">📢</span>
+    <div class="grow"><div class="label">New!</div><b id="bannerTitle"></b></div>
+    <button class="primary" id="bannerSee">See it</button>
+    <button class="ghost" id="bannerX" aria-label="Close">✕</button>
+  </div>
 
   <section class="hello" data-panel="me" aria-labelledby="hi">
     <div class="me" style="justify-content:space-between">
@@ -241,6 +276,11 @@ button.ghost{border:2px dashed var(--line)}
     </div>
   </section>
 
+  <section data-panel="news" aria-labelledby="newsH">
+    <h2 id="newsH">News · trips, events and more</h2>
+    <div class="posts" id="posts"></div>
+  </section>
+
   <section data-panel="board" aria-labelledby="boardH">
     <h2 id="boardH">Leaderboard</h2>
     <ul class="board" id="board"></ul>
@@ -251,8 +291,13 @@ button.ghost{border:2px dashed var(--line)}
 <div class="wrap" id="adminPage" hidden>
   <header>
     <div>
-      <div class="label">Minyan Points</div>
-      <h1>Admin</h1>
+      <div class="brand">
+        <img src="/logo.png" class="logo" alt="" width="64" height="64" style="width:64px;height:64px">
+        <div>
+          <div class="label">Minyan Points</div>
+          <h1>Admin</h1>
+        </div>
+      </div>
     </div>
     <button id="adminBack">← Back</button>
   </header>
@@ -292,6 +337,30 @@ button.ghost{border:2px dashed var(--line)}
     </div>
     <button id="lockBtn">Leave admin</button>
   </section>
+
+  <section aria-labelledby="postH" id="postBox" hidden class="admin">
+    <h2 id="postH">Post news</h2>
+    <p class="note" style="margin:0">Tell the boys about trips, events or anything new. They'll see a "New!" message when they open the site.</p>
+    <div class="row">
+      <select id="postKind" aria-label="Type">
+        <option value="trip">🚌 Trip</option>
+        <option value="event">🎉 Event</option>
+        <option value="news" selected>📢 News</option>
+        <option value="important">⚠️ Important</option>
+      </select>
+      <input id="postTitle" class="grow" placeholder="Title, e.g. Trip to Blackpool" maxlength="80" aria-label="Title">
+    </div>
+    <textarea id="postBody" placeholder="Details: where, what time, what to bring…" maxlength="1000" aria-label="Details"></textarea>
+    <div class="row">
+      <label class="label" for="postWhen">Date (optional)</label>
+      <input id="postWhen" type="date">
+      <button id="postGo" class="primary" style="margin-left:auto">Post it</button>
+    </div>
+    <div>
+      <div class="label" style="margin-bottom:8px">Your posts</div>
+      <ul class="mylein" id="myPosts"></ul>
+    </div>
+  </section>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -325,7 +394,8 @@ try { me = localStorage.getItem("mp_me"); adminCode = localStorage.getItem("mp_c
 let isAdmin = false;
 
 /* ---------- talking to the server ---------- */
-function apply(s){ boys = s.boys||{}; pts = s.pts||{}; leins = s.leins||{}; week = s.week||""; loaded = true; render(); }
+let posts = {};
+function apply(s){ boys = s.boys||{}; pts = s.pts||{}; leins = s.leins||{}; posts = s.posts||{}; week = s.week||""; loaded = true; render(); }
 async function load(){
   try{ const r = await fetch("/api/state", {cache:"no-store"}); if(r.ok) apply(await r.json()); }
   catch(e){}
@@ -514,6 +584,7 @@ function render(){
     li.querySelector(".p").textContent = pointsOf(id) + " pts";
     board.append(li);
   });
+  if(typeof renderNews === "function" && document.getElementById("posts")) try{ renderNews(); }catch(e){}
 }
 
 /* ---------- controls ---------- */
@@ -562,6 +633,65 @@ load().then(async () => {
 setInterval(() => { if(!document.hidden) load(); }, 15000);
 document.addEventListener("visibilitychange", () => { if(!document.hidden) load(); });
 
+/* ---------- news ---------- */
+const KINDS = {trip:"🚌 Trip", event:"🎉 Event", news:"📢 News", important:"⚠️ Important"};
+let seenAt = 0, bannerClosed = 0;
+try{ seenAt = +localStorage.getItem("mp_seen") || 0; bannerClosed = +localStorage.getItem("mp_banner") || 0; }catch(e){}
+const sortedPosts = () => Object.entries(posts).sort((a,b)=>(b[1].at||0)-(a[1].at||0));
+const niceDate = d => new Date(d+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+const ago = t => { const m = Math.round((Date.now()-t)/60000); if(m<60) return m<=1?"just now":m+" min ago"; const h=Math.round(m/60); if(h<24) return h+" hr ago"; const d=Math.round(h/24); return d===1?"yesterday":d+" days ago"; };
+function currentTab(){ return document.querySelector('.tabs [aria-selected="true"]')?.dataset.tab; }
+function markSeen(){ const top = sortedPosts()[0]; if(top && (top[1].at||0) > seenAt){ seenAt = top[1].at; try{ localStorage.setItem("mp_seen", seenAt); }catch(e){} } }
+function renderNews(){
+  const list = sortedPosts();
+  const onNews = currentTab() === "news";
+  const unread = list.filter(([,p]) => (p.at||0) > seenAt);
+  $("newsBadge").hidden = !unread.length || onNews;
+  $("newsBadge").textContent = unread.length;
+  const top = unread[0];
+  $("banner").hidden = !top || onNews || (top && top[1].at <= bannerClosed);
+  if(top) $("bannerTitle").textContent = top[1].title;
+
+  const box = $("posts"); box.innerHTML = "";
+  if(!list.length) box.innerHTML = `<p class="empty" style="margin:0">No news yet. When the admin posts a trip or event, it shows up here.</p>`;
+  list.forEach(([id,p])=>{
+    const d = document.createElement("article");
+    d.className = "post" + ((p.at||0) > seenAt ? " unread" : "");
+    d.innerHTML = `<div class="meta"><span class="kind"></span><span class="when"></span><span class="ago"></span></div><h3></h3><p></p>`;
+    d.querySelector(".kind").textContent = KINDS[p.kind] || KINDS.news;
+    if(p.kind === "important") d.querySelector(".kind").classList.add("important");
+    d.querySelector(".when").textContent = p.when ? "📅 " + niceDate(p.when) : "";
+    d.querySelector(".ago").textContent = "Posted " + ago(p.at||Date.now());
+    d.querySelector("h3").textContent = p.title;
+    d.querySelector("p").textContent = p.body || "";
+    if(!p.body) d.querySelector("p").remove();
+    box.append(d);
+  });
+  if(onNews) markSeen();
+
+  $("postBox").hidden = !isAdmin;
+  if(isAdmin){
+    const mine = $("myPosts"); mine.innerHTML = "";
+    if(!list.length) mine.innerHTML = `<li class="empty">Nothing posted yet.</li>`;
+    list.forEach(([id,p])=>{
+      const li = document.createElement("li");
+      li.innerHTML = `<span></span>`;
+      li.firstChild.textContent = `${(KINDS[p.kind]||"").split(" ")[0]} ${p.title}`;
+      const b = document.createElement("button"); b.textContent = "Delete";
+      b.onclick = async () => { if(!confirm(`Delete "${p.title}"?`)) return; if(await api("deletePost",{postId:id})) toast("Post deleted"); };
+      li.append(b); mine.append(li);
+    });
+  }
+}
+$("postGo").onclick = async () => {
+  const title = $("postTitle").value.trim();
+  if(!title){ toast("Give the post a title"); return; }
+  const j = await api("addPost", {kind:$("postKind").value, title, body:$("postBody").value, when:$("postWhen").value});
+  if(j){ $("postTitle").value = ""; $("postBody").value = ""; $("postWhen").value = ""; toast("Posted! The boys will see it 📢"); }
+};
+$("bannerSee").onclick = () => showTab("news");
+$("bannerX").onclick = () => { const top = sortedPosts()[0]; if(top){ bannerClosed = top[1].at; try{ localStorage.setItem("mp_banner", bannerClosed); }catch(e){} } renderNews(); };
+
 /* ---------- tabs ---------- */
 let tab = "me";
 try{ tab = localStorage.getItem("mp_tab") || "me"; }catch(e){}
@@ -570,6 +700,7 @@ function showTab(t){
   document.querySelectorAll("[data-panel]").forEach(el => el.hidden = el.dataset.panel !== t);
   document.querySelectorAll(".tabs [data-tab]").forEach(b => { b.setAttribute("aria-selected", b.dataset.tab === t); b.tabIndex = b.dataset.tab === t ? 0 : -1; });
   try{ localStorage.setItem("mp_tab", t); }catch(e){}
+  renderNews();
 }
 document.querySelectorAll(".tabs [data-tab]").forEach(b => b.onclick = () => showTab(b.dataset.tab));
 showTab(document.querySelector(`.tabs [data-tab="${tab}"]`) ? tab : "me");
