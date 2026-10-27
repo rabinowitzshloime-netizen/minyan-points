@@ -81,16 +81,23 @@ export default async function handler(req, res) {
             const kinds = ["trip", "event", "news", "important"];
             const kind = kinds.includes(b.kind) ? b.kind : "news";
             const title = String(b.title || "").trim().slice(0, 80);
-            const body = String(b.body || "").trim().slice(0, 1000);
+            const body = String(b.body || "").trim().slice(0, 3000);
+            let link = String(b.link || "").trim().slice(0, 500);
+            if (link && !/^https?:\/\//i.test(link)) link = "https://" + link;
+            const img = typeof b.image === "string" ? b.image : "";
+            if (img && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > 900000)) no("That picture is too big or not a picture. Try a smaller one.");
             const when = /^\d{4}-\d{2}-\d{2}$/.test(b.when || "") ? b.when : "";
             if (!title) no("Give the post a title.");
             if (Object.keys(s.posts).length >= 100) no("Too many posts. Delete some old ones first.");
-            await redis.hset("posts", { [id()]: { kind, title, body, when, at: Date.now() } });
+            const pid = id();
+            if (img) await redis.hset("img", { [pid]: img });
+            await redis.hset("posts", { [pid]: { kind, title, body, when, link, hasImg: !!img, at: Date.now() } });
             break;
           }
           case "deletePost": {
             if (!s.posts[b.postId]) no("That post isn't there anymore.");
             await redis.hdel("posts", b.postId);
+            await redis.hdel("img", b.postId);
             break;
           }
           default: no("Unknown action.");
