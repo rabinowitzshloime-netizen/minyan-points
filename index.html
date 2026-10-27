@@ -264,7 +264,6 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
     </div>
     <div class="top-right">
       <div class="heb">בס״ד</div>
-      <button id="adminOpen" class="ghost">🔒 Admin</button>
     </div>
   </header>
 
@@ -555,7 +554,6 @@ function render(){
     earn.append(li);
   });
   $("codeBox").hidden = isAdmin;
-  $("adminOpen").textContent = isAdmin ? "Admin" : "🔒 Admin";
 
   // admin panel
   $("adminBox").hidden = !isAdmin;
@@ -694,7 +692,6 @@ $("resetBtn").onclick = async () => {
   if(!confirm(`Reset ${boys[id].name}'s login? He'll pick a new username and password with "No login yet".`)) return;
   if(await api("resetLogin", {boyId:id})) toast(`${boys[id].name} can set up his login again`);
 };
-$("adminOpen").onclick = () => { location.hash = "admin"; };
 $("adminBack").onclick = () => { try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){ location.hash = ""; } render(); window.scrollTo(0,0); };
 window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); });
 $("codeGo").onclick = async () => {
