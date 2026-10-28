@@ -407,10 +407,10 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
       </select>
       <input id="postTitle" class="grow" placeholder="Title, e.g. Trip to Blackpool" maxlength="80" aria-label="Title">
     </div>
-    <div id="postBody" class="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Details" data-ph="Type the details here, or copy your whole Google Doc (Ctrl+A, Ctrl+C) and paste it here (Ctrl+V). It keeps the headings, bold, lists and pictures."></div>
+    <div id="postBody" class="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Details" data-ph="Type the details here, or copy your whole Google Doc (Ctrl+A, Ctrl+C) and paste it here (Ctrl+V). Writing and pictures all go in here. You can also paste or drag in any picture."></div>
     <div class="drop" id="drop">
       <img id="picPrev" alt="Picture for the post" hidden>
-      <span id="dropText" class="grow">📷 Add a picture: drag it here, paste it (Ctrl+V), or</span>
+      <span id="dropText" class="grow">📷 Optional: a picture to show at the top of the post</span>
       <label class="filebtn" for="picIn">Choose picture</label>
       <input id="picIn" type="file" accept="image/*" hidden>
       <button id="picX" hidden>Remove picture</button>
@@ -814,7 +814,7 @@ $("postGo").onclick = async () => {
 };
 /* picture for a post: shrink it so it uploads fast */
 let picData = "";
-function setPic(d){ picData = d; $("picPrev").hidden = !d; if(d) $("picPrev").src = d; else $("picPrev").removeAttribute("src"); $("picX").hidden = !d; $("dropText").textContent = d ? "📷 Picture added" : "📷 Add a picture: drag it here, paste it (Ctrl+V), or"; }
+function setPic(d){ picData = d; $("picPrev").hidden = !d; if(d) $("picPrev").src = d; else $("picPrev").removeAttribute("src"); $("picX").hidden = !d; $("dropText").textContent = d ? "📷 Top picture added" : "📷 Optional: a picture to show at the top of the post"; }
 /* shrink any picture to a small JPEG (resolves "" if it can't) */
 function shrinkPic(src, maxLen = 850000, side = 1400){
   return new Promise(res => {
@@ -873,10 +873,30 @@ function cleanPaste(html){
   out.querySelectorAll("p").forEach(p => { if(!p.textContent.trim() && !p.querySelector("img")) p.replaceWith(document.createElement("br")); });
   return out.innerHTML;
 }
+/* put pictures straight into the details box */
+async function insertPics(files){
+  const ed = $("postBody");
+  for(const f of files.slice(0, 10)){
+    const url = URL.createObjectURL(f);
+    const d = await shrinkPic(url, 850000, 1400);
+    URL.revokeObjectURL(url);
+    if(!d) continue;
+    ed.focus();
+    document.execCommand("insertHTML", false, `<img src="${d}"><br>`);
+  }
+}
+const picFiles = list => [...(list||[])].filter(i => (i.kind === undefined || i.kind === "file") && /^image\//.test(i.type)).map(i => i.getAsFile ? i.getAsFile() : i).filter(Boolean);
 $("postBody").addEventListener("paste", e => {
   const cd = e.clipboardData; if(!cd) return;
-  const html = cd.getData("text/html");
-  if(html){ e.preventDefault(); e.stopPropagation(); document.execCommand("insertHTML", false, cleanPaste(html)); return; }
+  const html = cd.getData("text/html"), files = picFiles(cd.items);
+  if(html){
+    e.preventDefault(); e.stopPropagation();
+    const clean = cleanPaste(html);
+    document.execCommand("insertHTML", false, clean);
+    if(files.length && !/<img/i.test(clean)) insertPics(files);
+    return;
+  }
+  if(files.length){ e.preventDefault(); e.stopPropagation(); insertPics(files); return; }
   const text = cd.getData("text/plain");
   if(text){ e.preventDefault(); e.stopPropagation(); document.execCommand("insertText", false, text); }
 });
@@ -902,6 +922,8 @@ function pollEl(pid, p){
   return box;
 }
 
+$("postBody").addEventListener("dragover", e => { if([...e.dataTransfer.items].some(i => i.kind === "file")) e.preventDefault(); });
+$("postBody").addEventListener("drop", e => { const f = picFiles(e.dataTransfer.files); if(f.length){ e.preventDefault(); e.stopPropagation(); insertPics(f); } });
 $("postBox").addEventListener("paste", e => {
   const f = [...(e.clipboardData?.items||[])].find(i => i.type.startsWith("image/"))?.getAsFile();
   if(f){ e.preventDefault(); readPic(f); }
