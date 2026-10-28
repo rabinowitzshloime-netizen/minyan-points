@@ -1,5 +1,5 @@
 import { redis, getState, isAdmin, weekKey, RULES, PARTS, WEEK_MAX, BONUS, publicState, sessionUser, newSession, hashPw, checkPw, cleanUser, USER_OK } from "../lib/shared.js";
-import { cleanHtml, imgSrcs } from "../lib/clean.js";
+import { cleanHtml, imgSrcs, cutHtml } from "../lib/clean.js";
 
 const ADMIN_USER = cleanUser(process.env.ADMIN_USER || "admin");
 const id = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -159,7 +159,9 @@ export default async function handler(req, res) {
             const link = "";
             const options = (Array.isArray(b.options) ? b.options : []).map(o => String(o || "").trim().slice(0, 60)).filter(Boolean).slice(0, 8);
             if (options.length === 1) no("A vote needs at least 2 answers.");
-            let html = cleanHtml(String(b.html || "").slice(0, 60000)).slice(0, 40000);
+            let html = cutHtml(cleanHtml(cutHtml(b.html, 80000)), 40000);
+            const inline = (Array.isArray(b.inline) ? b.inline : []).slice(0, 10);
+            const okPic = d => typeof d === "string" && d.length < 900000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(d);
             const img = typeof b.image === "string" ? b.image : "";
             if (img && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > 900000)) no("That picture is too big or not a picture. Try a smaller one.");
             const when = /^\d{4}-\d{2}-\d{2}$/.test(b.when || "") ? b.when : "";
@@ -173,7 +175,7 @@ export default async function handler(req, res) {
               const key = pid + "x" + (n++);
               let local = "";
               try {
-                if (src.startsWith("data:image/") && src.length < 900000) local = src;
+                if (src.startsWith("inline:")) { const d = inline[Number(src.slice(7))]; if (okPic(d)) local = d; }
                 else if (src.startsWith("https://")) {
                   const r = await fetch(src);
                   const type = (r.headers.get("content-type") || "").split(";")[0];
@@ -183,7 +185,7 @@ export default async function handler(req, res) {
               } catch (e) {}
               const safe = src.replace(/&/g, "&amp;");
               if (local) { await redis.hset("img", { [key]: local }); html = html.split(`src="${safe}"`).join(`src="/api/img?id=${key}"`); }
-              else if (src.startsWith("data:")) html = html.split(`<img src="${safe}" alt="">`).join("");
+              else html = html.split(`<img src="${safe}" alt="">`).join("");
             }
             await redis.hset("posts", { [pid]: { kind, title, body: html ? "" : body, html, when, link, options, hasImg: !!img, imgs: n, at: Date.now() } });
             break;

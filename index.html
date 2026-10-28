@@ -795,36 +795,53 @@ function renderNews(){
 $("postGo").onclick = async () => {
   const title = $("postTitle").value.trim();
   if(!title){ toast("Give the post a title"); return; }
-  $("postGo").disabled = true; $("postGo").textContent = "Posting…";
   const options = $("postOpts").value.split("\n").map(s=>s.trim()).filter(Boolean);
   if(options.length === 1){ toast("A vote needs at least 2 answers"); return; }
-  const ed = $("postBody"), html = ed.textContent.trim() || ed.querySelector("img") ? ed.innerHTML : "";
-  const j = await api("addPost", {kind:$("postKind").value, title, html, when:$("postWhen").value, options, image: picData});
+  $("postGo").disabled = true; $("postGo").textContent = "Posting…";
+  // pictures inside the details get shrunk and sent separately, so they never get cut in half
+  const ed = $("postBody").cloneNode(true), inline = [];
+  const local = [...ed.querySelectorAll("img")].filter(im => /^(data|blob):/.test(im.getAttribute("src")||""));
+  const each = Math.min(850000, Math.floor(3000000 / Math.max(1, local.length + (picData ? 1 : 0))));
+  for(const im of local.slice(0, 10)){
+    const small = await shrinkPic(im.getAttribute("src"), each, 1200);
+    if(small){ im.setAttribute("src", "inline:" + inline.length); inline.push(small); } else im.remove();
+  }
+  local.slice(10).forEach(im => im.remove());
+  const html = ed.textContent.trim() || ed.querySelector("img") ? ed.innerHTML : "";
+  const j = await api("addPost", {kind:$("postKind").value, title, html, inline, when:$("postWhen").value, options, image: picData});
   $("postGo").disabled = false; $("postGo").textContent = "Post it";
   if(j){ $("postTitle").value = ""; $("postBody").innerHTML = ""; $("postWhen").value = ""; $("postOpts").value = ""; setPic(""); toast("Posted! The boys will see it 📢"); }
 };
 /* picture for a post: shrink it so it uploads fast */
 let picData = "";
 function setPic(d){ picData = d; $("picPrev").hidden = !d; if(d) $("picPrev").src = d; else $("picPrev").removeAttribute("src"); $("picX").hidden = !d; $("dropText").textContent = d ? "📷 Picture added" : "📷 Add a picture: drag it here, paste it (Ctrl+V), or"; }
-function readPic(file){
+/* shrink any picture to a small JPEG (resolves "" if it can't) */
+function shrinkPic(src, maxLen = 850000, side = 1400){
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => {
+      let q = .85, out = "";
+      for(let i=0;i<8;i++){
+        const k = Math.min(1, side/Math.max(im.width, im.height));
+        const c = document.createElement("canvas"); c.width = Math.max(1,Math.round(im.width*k)); c.height = Math.max(1,Math.round(im.height*k));
+        const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0,c.width,c.height);
+        out = c.toDataURL("image/jpeg", Math.max(q, .4));
+        if(out.length < maxLen) break;
+        side *= .8; q -= .08;
+      }
+      res(out.length < maxLen ? out : "");
+    };
+    im.onerror = () => res("");
+    im.src = src;
+  });
+}
+async function readPic(file){
   if(!file || !/^image\//.test(file.type)){ toast("That isn't a picture"); return; }
-  const url = URL.createObjectURL(file), im = new Image();
-  im.onload = () => {
-    let side = 1400, q = .85, out = "";
-    for(let i=0;i<6;i++){
-      const k = Math.min(1, side/Math.max(im.width, im.height));
-      const c = document.createElement("canvas"); c.width = Math.round(im.width*k); c.height = Math.round(im.height*k);
-      const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0,c.width,c.height);
-      out = c.toDataURL("image/jpeg", q);
-      if(out.length < 850000) break;
-      side *= .8; q -= .07;
-    }
-    URL.revokeObjectURL(url);
-    if(out.length >= 850000){ toast("That picture is too big"); return; }
-    setPic(out);
-  };
-  im.onerror = () => { URL.revokeObjectURL(url); toast("Couldn't open that picture"); };
-  im.src = url;
+  const url = URL.createObjectURL(file);
+  const out = await shrinkPic(url);
+  URL.revokeObjectURL(url);
+  if(!out){ toast("Couldn't use that picture. Try another one."); return; }
+  setPic(out);
 }
 $("picIn").onchange = e => { readPic(e.target.files[0]); e.target.value = ""; };
 $("picX").onclick = () => setPic("");
