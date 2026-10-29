@@ -550,6 +550,7 @@ let isAdmin = false;
 /* ---------- talking to the server ---------- */
 let posts = {}, votes = {}, myVotes = {};
 function apply(s){
+  buildParshaList(s.upcoming);
   if(!parshaPicked && Array.isArray(s.parsha)){ const i = HEBCAL.indexOf(s.parsha.join("-")); if(i >= 0) $("parsha").value = PARSHIYOS[i]; }
   boys = s.boys||{}; pts = s.pts||{}; leins = s.leins||{}; posts = s.posts||{}; votes = s.votes||{}; myVotes = s.myVotes||{}; me = s.me||null; if(!me && tok){ tok = ""; try{ sessionStorage.removeItem("mp_tok"); }catch(e){} } week = s.week||""; loaded = true; render(); }
 async function load(){
@@ -753,12 +754,30 @@ function render(){
 }
 
 /* ---------- controls ---------- */
-// list them in reading order, with each double parsha right after its two parts
-PARSHIYOS.slice(0, 54).forEach(p => {
-  $("parsha").add(new Option(`${p} · ${heOf(p)}` + (p === "Vezos Haberachah" ? " (Simchas Torah)" : ""), p));
-  const dbl = PARSHIYOS.slice(54).find(d => d.endsWith("-" + p));
-  if(dbl) $("parsha").add(new Option(`${dbl} · ${heOf(dbl)} (together)`, dbl));
-});
+// List them in reading order. Each year, show a double parsha only if it's read together
+// the next time round, otherwise show its two parts (the server sends the coming year's calendar).
+let listKey = "";
+function buildParshaList(upcoming){
+  const together = {};   // single parsha -> true if next time it's read as part of a double
+  if(Array.isArray(upcoming)){
+    for(let i = 0; i < 54; i++){
+      const ev = upcoming.find(e => e.includes(HEBCAL[i]));
+      if(ev) together[i] = ev.length > 1;
+    }
+  }
+  const key = JSON.stringify(together);
+  if(key === listKey) return;
+  listKey = key;
+  const sel = $("parsha"), keep = sel.value;
+  sel.innerHTML = "";
+  PARSHIYOS.slice(0, 54).forEach((p, i) => {
+    if(!together[i]) sel.add(new Option(`${p} · ${heOf(p)}` + (p === "Vezos Haberachah" ? " (Simchas Torah)" : ""), p));
+    const dbl = PARSHIYOS.slice(54).find(d => d.endsWith("-" + p));
+    if(dbl && together[i]) sel.add(new Option(`${dbl} · ${heOf(dbl)} (together)`, dbl));
+  });
+  if(keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+}
+buildParshaList(null);
 $("parsha").value = DEFAULT_PARSHA;
 $("parsha").onchange = () => { parshaPicked = true; render(); };
 $("givePick").onchange = render;
