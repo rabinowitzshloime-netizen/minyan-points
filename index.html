@@ -241,7 +241,9 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .tk-torah.measure .tk-sline{width:max-content}
 .tk-out{opacity:.28}
 .tk-p2{position:relative;background:#ffd9a8;border-radius:5px;box-shadow:0 0 0 2px #ffd9a8}
-.tk-p2:hover::before,.tk-p2.show::before{content:attr(data-label);position:absolute;bottom:calc(100% + 2px);right:0;font-family:var(--body);font-size:11px;font-weight:700;line-height:1.5;color:#fff;background:#d9822b;border-radius:6px;padding:0 7px;white-space:nowrap;direction:ltr;pointer-events:none;z-index:2}
+.tk-p2::before{content:attr(data-label);position:absolute;bottom:calc(100% + 2px);right:0;font-family:var(--body);font-size:11px;font-weight:700;line-height:1.5;color:#fff;background:#d9822b;border-radius:6px;padding:0 7px;white-space:nowrap;direction:ltr;pointer-events:none;z-index:2}
+.tk-sline:has(.tk-p2){margin-top:1.05em}
+.tk-v.tk-p2v{display:inline-block;margin-top:.9em}
 .tk-n.tk-p2{font-size:.55em;color:#8a3b12;padding:0 .2em}
 .tk-p2v{background:rgba(255,217,168,.45);border-radius:6px}
 .tk-big{font-size:1.45em;line-height:0}
@@ -553,8 +555,22 @@ try { tok = sessionStorage.getItem("mp_tok") || ""; adminCode = sessionStorage.g
 let isAdmin = false;
 
 /* ---------- talking to the server ---------- */
-let posts = {}, votes = {}, myVotes = {};
+let posts = {}, votes = {}, myVotes = {}, upcoming = [], upDates = [], today = "";
+// the Shabbos a parsha will next be read on (from the server's calendar), e.g. "2026-10-31"
+function dateFor(parsha){
+  const h = HEBCAL[PARSHIYOS.indexOf(parsha)];
+  const i = upcoming.findIndex(e => e.join("-") === h);
+  return i >= 0 ? (upDates[i] || "") : "";
+}
+// is this booking's Shabbos no more than `days` ago (bookings without a date always count)
+function recent(date, days){
+  if(!date || !today) return true;
+  const d = new Date(today); d.setDate(d.getDate() - days);
+  return new Date(date) >= d;
+}
+const niceShabbos = d => d ? "Shabbos " + new Date(d + "T12:00:00").toLocaleDateString("en-GB", {day:"numeric", month:"short"}) : "";
 function apply(s){
+  upcoming = Array.isArray(s.upcoming) ? s.upcoming : []; upDates = Array.isArray(s.upcomingDates) ? s.upcomingDates : []; today = s.today || "";
   buildParshaList(s.upcoming);
   if(!parshaPicked && Array.isArray(s.parsha)){ const i = HEBCAL.indexOf(s.parsha.join("-")); if(i >= 0) $("parsha").value = PARSHIYOS[i]; }
   boys = s.boys||{}; pts = s.pts||{}; leins = s.leins||{}; posts = s.posts||{}; votes = s.votes||{}; myVotes = s.myVotes||{}; me = s.me||null; if(!me && tok){ tok = ""; try{ sessionStorage.removeItem("mp_tok"); }catch(e){} } week = s.week||""; loaded = true; render(); }
@@ -603,7 +619,8 @@ async function giveBonus(boyId){
 async function takeOne(boyId){
   if(!boys[boyId]) { toast("Choose a boy first"); return; }
   const name = boys[boyId].name;
-  if(await api("minus", {boyId})) toast(`-1 from ${name}`);
+  const j = await api("minus", {boyId});
+  if(j) toast(`-1 from ${name}` + (j.undone === "lein" ? " · their leining is back on the waiting list" : j.undone ? ` · "${(EARN.find(e => e.k === j.undone) || {t: j.undone}).t}" can be given again` : ""));
 }
 async function markGiven(boyId){
   const name = boys[boyId].name;
@@ -681,13 +698,13 @@ function render(){
     $("removeBtn").disabled = !sel;
 
     const pend = $("pending"); pend.innerHTML = "";
-    const waiting = Object.entries(leins).filter(([,l])=>!l.awarded && boys[l.boyId]);
+    const waiting = Object.entries(leins).filter(([,l])=>!l.awarded && boys[l.boyId] && recent(l.date, 30));
     if(!waiting.length) pend.innerHTML = `<li class="empty">No leining waiting.</li>`;
     waiting.forEach(([id,l])=>{
       const part = PARTS.find(p=>p.k===l.part); if(!part) return;
       const li = document.createElement("li");
       li.innerHTML = `<span></span>`;
-      li.firstChild.textContent = `${boys[l.boyId].name} · ${part.t} · ${l.parsha}`;
+      li.firstChild.textContent = `${boys[l.boyId].name} · ${part.t} · ${l.parsha}` + (l.date ? ` · ${niceShabbos(l.date)}` : "");
       const b = document.createElement("button"); b.className="primary"; b.textContent = "Give +1";
       const leinDone = doneOf(l.boyId).includes("lein");
       b.disabled = leinDone || weekOf(l.boyId) >= WEEK_MAX;
@@ -713,7 +730,8 @@ function render(){
   const parsha = $("parsha").value;
   const parts = $("parts"); parts.innerHTML = "";
   PARTS.forEach(p=>{
-    const takenId = Object.keys(leins).find(id => leins[id].parsha===parsha && leins[id].part===p.k);
+    const pDate = dateFor(parsha);
+    const takenId = Object.keys(leins).find(id => leins[id].parsha===parsha && leins[id].part===p.k && (!leins[id].date || !pDate || leins[id].date === pDate));
     const t = takenId && leins[takenId];
     const b = document.createElement("button");
     b.className = "part" + (t ? (t.boyId===me ? " mine" : " taken") : "") + (t&&t.awarded ? " done":"");
@@ -731,19 +749,19 @@ function render(){
     b.disabled = !boys[me] || (t && t.boyId!==me) || (t && t.awarded);
     b.onclick = async () => {
       if(t && t.boyId===me){ if(await api("dropLein", {leinId:takenId})) toast("Removed"); return; }
-      if(await api("signLein", {parsha, part:p.k})) toast(`You're saying ${p.t}`);
+      if(await api("signLein", {parsha, part:p.k, date: pDate})) toast(`You're saying ${p.t}`);
     };
     parts.append(b);
   });
 
   const my = $("myLein"); my.innerHTML = "";
-  const mine = Object.entries(leins).filter(([,l])=>l.boyId===me);
+  const mine = Object.entries(leins).filter(([,l])=>l.boyId===me && recent(l.date, 7)).sort((a,b)=>(a[1].date||"").localeCompare(b[1].date||""));
   if(!mine.length){ my.innerHTML = `<li class="empty">Nothing yet. Pick a part above.</li>`; }
   mine.forEach(([,l])=>{
     const part = PARTS.find(p=>p.k===l.part); if(!part) return;
     const li = document.createElement("li");
     li.innerHTML = `<span></span>`;
-    li.firstChild.textContent = `${part.t} · ${l.parsha} · ${heOf(l.parsha)}`;
+    li.firstChild.textContent = `${part.t} · ${l.parsha} · ${heOf(l.parsha)}` + (l.date ? ` · ${niceShabbos(l.date)}` : "");
     li.insertAdjacentHTML("beforeend", l.awarded ? `<span class="chip done">Got +1</span>` : `<span class="chip">Waiting for admin</span>`);
     const pr = document.createElement("button"); pr.className = "primary"; pr.textContent = "📜 Practise";
     pr.onclick = () => openTikkun(l.parsha, l.part);
@@ -830,7 +848,7 @@ $("signupForm").onsubmit = async e => { e.preventDefault();
 $("claimForm").onsubmit = async e => { e.preventDefault();
   const id = $("clPick").value; if(!id){ toast("Choose your name"); return; }
   loggedIn(await api("claim", {boyId:id, username:$("clUser").value, password:$("clPass").value}), "You're all set up! 🎉"); };
-$("switchBtn").onclick = async () => { await api("logout"); tok = ""; me = null; try{ sessionStorage.removeItem("mp_tok"); }catch(x){} render(); toast("Logged out"); };
+$("switchBtn").onclick = async () => { await api("logout"); tok = ""; me = null; try{ sessionStorage.removeItem("mp_tok"); }catch(x){} setMode("login"); render(); toast("Logged out"); };
 $("resetBtn").onclick = async () => {
   const id = $("givePick").value; if(!boys[id]) return;
   if(!confirm(`Reset ${boys[id].name}'s login? He'll pick a new username and password with "No login yet".`)) return;

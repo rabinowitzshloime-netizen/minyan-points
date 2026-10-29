@@ -1,4 +1,4 @@
-import { redis, getState, isAdmin, weekKey, RULES, PARTS, WEEK_MAX, BONUS, publicState, sessionUser, newSession, hashPw, checkPw, cleanUser, USER_OK } from "../lib/shared.js";
+import { redis, getState, isAdmin, weekKey, RULES, PARTS, WEEK_MAX, BONUS, publicState, sessionUser, newSession, hashPw, checkPw, cleanUser, USER_OK, upcomingDates, todayYmd } from "../lib/shared.js";
 import { cleanHtml, imgSrcs, cutHtml } from "../lib/clean.js";
 
 const ADMIN_USER = cleanUser(process.env.ADMIN_USER || "admin");
@@ -84,9 +84,16 @@ export default async function handler(req, res) {
         b.boyId = mustLogIn();
         if (!PARTS.includes(b.part)) no("Pick a part.");
         const parsha = String(b.parsha || "").slice(0, 40);
-        const taken = Object.values(s.leins).some(l => l.parsha === parsha && l.part === b.part);
+        // which Shabbos it's for, so next year's reading of the same parsha is free again
+        const dates = upcomingDates() || [];
+        const date = dates.includes(b.date) ? b.date : "";
+        const taken = Object.values(s.leins).some(l => l.parsha === parsha && l.part === b.part && (!l.date || !date || l.date === date));
         if (taken) no("Someone already took that part.");
-        await redis.hset("leins", { [id()]: { boyId: b.boyId, parsha, part: b.part, awarded: false } });
+        await redis.hset("leins", { [id()]: { boyId: b.boyId, parsha, part: b.part, date, awarded: false } });
+        // tidy up bookings from more than 2 months ago
+        const cutoff = new Date(todayYmd()); cutoff.setDate(cutoff.getDate() - 60);
+        const old = Object.keys(s.leins).filter(k => s.leins[k].date && new Date(s.leins[k].date) < cutoff);
+        if (old.length) await redis.hdel("leins", ...old);
         break;
       }
       case "dropLein": {
@@ -133,7 +140,22 @@ export default async function handler(req, res) {
             break;
           }
           case "bonus": { boy(b.boyId); const r = rec(b.boyId); await redis.hset("pts", { [b.boyId]: { ...r, points: (r.points || 0) + BONUS } }); break; }
-          case "minus": { boy(b.boyId); const r = rec(b.boyId); if (!r.points) no("They have 0 points."); await redis.hset("pts", { [b.boyId]: { ...r, points: r.points - 1 } }); break; }
+          case "minus": {
+            boy(b.boyId); const r = rec(b.boyId);
+            if (!r.points) no("They have 0 points.");
+            // also undo the last thing ticked this Shabbos, so the right one can be given instead
+            const done = r.week === wk ? [...(r.done || [])] : [];
+            const undone = done.pop();
+            await redis.hset("pts", { [b.boyId]: { ...r, points: r.points - 1, ...(undone ? { done } : {}) } });
+            out.undone = undone || null;
+            // taking back a leining point puts that leining back on the "waiting for points" list
+            if (undone === "lein") {
+              const lk = Object.keys(s.leins).filter(k => s.leins[k].boyId === b.boyId && s.leins[k].awarded)
+                .sort((x, y) => (s.leins[y].date || "").localeCompare(s.leins[x].date || ""))[0];
+              if (lk) await redis.hset("leins", { [lk]: { ...s.leins[lk], awarded: false } });
+            }
+            break;
+          }
           case "markGiven": { boy(b.boyId); const r = rec(b.boyId); await redis.hset("pts", { [b.boyId]: { ...r, given: (r.given || 0) + 1 } }); break; }
           case "resetLogin": {
             const old = boy(b.boyId);
