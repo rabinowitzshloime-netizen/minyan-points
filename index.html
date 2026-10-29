@@ -223,6 +223,20 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .tk-torah{text-align:right;line-height:1.75}
 .tk-line{display:flex;gap:.3em;white-space:nowrap;justify-content:flex-start}
 .tk-line.full{justify-content:space-between}
+.tk-torah.scroll{line-height:1.6}
+.tk-colmark{font-family:var(--body);font-size:12px;color:#8a7a55;text-align:center;margin:.6em 0 .2em;letter-spacing:.06em;text-transform:uppercase;line-height:1.4}
+.tk-colmark:first-child{margin-top:0}
+.tk-sline{display:flex;gap:2em;white-space:nowrap}
+.tk-scol{flex:1;display:flex;justify-content:space-between;gap:.3em}
+.tk-sline.two .tk-scol{flex:0 1 auto}
+.tk-sline.two{justify-content:space-between}
+.tk-scol.setuma{gap:2.4em}
+.tk-frag{display:flex;justify-content:space-between;gap:.3em;flex:1}
+.tk-scol.setuma .tk-frag{flex:0 1 auto;justify-content:flex-start}
+.tk-sline.pet .tk-scol,.tk-sline.pet .tk-frag{justify-content:flex-start;flex:0 1 auto}
+.tk-torah.measure .tk-scol,.tk-torah.measure .tk-frag{justify-content:flex-start;flex:0 0 auto}
+.tk-torah.measure .tk-sline{width:max-content}
+.tk-out{opacity:.28}
 .tk-big{font-size:1.45em;line-height:0}
 .tk-small{font-size:.65em}
 .tk-sgap{display:inline-block;width:3.2em;flex:none}
@@ -1016,12 +1030,51 @@ async function openTikkun(parsha, part){
     const sec = d.parts[part];
     if(!sec){ $("tkRef").textContent = "This part isn't in the tikkun yet."; return; }
     $("tkRef").textContent = `${PART_HE[part]} · ${niceRef(sec.ref)}`;
+    tkScroll = part !== "haftorah" && d.scroll ? d.scroll : null;
     drawTikkun(sec);
   }catch(e){ $("tkRef").textContent = "Couldn't load the tikkun. Check your internet and try again."; }
 }
 /* Lay out the Sefer Torah side like a real column: every line stretched to the
    same length, a gap for a setuma, and the rest of the line left empty for a pesucha. */
-let tkWords = [], tkVerses = [], tkLaidW = 0;
+let tkWords = [], tkVerses = [], tkLaidW = 0, tkScroll = null;
+/* The real Sefer Torah layout (from tikkun.io): exact lines, setumos, pesuchos and the shiros */
+function renderScroll(tor, W, force){
+  const idx = {}, special = {};
+  tkVerses.forEach((v, i) => { idx[v[0]] = i; v[2].split(" ").filter(w => /[{[]/.test(w)).forEach(w => special[v[0] + "|" + w.replace(/[{}[\]]/g, "")] = w); });
+  const lines = tkScroll.filter(L => L.k.some(col => col.some(fr => fr.some(([w, r]) => r in idx))));
+  tor.innerHTML = "";
+  tor.classList.add("scroll");
+  let lastCol = null;
+  for(const L of lines){
+    if(L.c !== lastCol){
+      const h = document.createElement("div"); h.className = "tk-colmark"; h.textContent = `Column ${L.c} · line ${L.l}`;
+      tor.append(h); lastCol = L.c;
+    }
+    const d = document.createElement("div"); d.className = "tk-sline" + (L.p ? " pet" : "") + (L.k.length > 1 ? " two" : "");
+    L.k.forEach(col => {
+      const c = document.createElement("div"); c.className = "tk-scol" + (col.length > 1 ? " setuma" : "");
+      col.forEach(fr => {
+        const f = document.createElement("span"); f.className = "tk-frag";
+        fr.forEach(([w, r]) => {
+          const sp = document.createElement("span"); heb(sp, special[r + "|" + w] || w);
+          if(r in idx){ sp.className = "tk-v tk-w"; sp.dataset.i = idx[r]; } else sp.className = "tk-out";
+          f.append(sp);
+        });
+        c.append(f);
+      });
+      d.append(c);
+    });
+    tor.append(d);
+  }
+  // shrink the writing if the longest line doesn't fit
+  tor.style.fontSize = "";
+  const base = parseFloat(getComputedStyle(tor).fontSize);
+  tor.classList.add("measure");
+  let widest = 0;
+  tor.querySelectorAll(".tk-sline").forEach(el => { widest = Math.max(widest, el.scrollWidth); });
+  tor.classList.remove("measure");
+  if(widest > W) tor.style.fontSize = Math.max(12, Math.floor(base * W / widest * 0.98)) + "px";
+}
 // write Hebrew into an element: {x} is a big letter, [x] a small or hanging letter (like in the Sefer Torah)
 function heb(el, str){
   el.textContent = "";
@@ -1039,6 +1092,8 @@ function layoutTorah(force){
   const W = tor.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   if(W <= 0 || (!force && Math.abs(W - tkLaidW) < 1)) return;
   tkLaidW = W;
+  if(tkScroll){ renderScroll(tor, W, force); return; }
+  tor.classList.remove("scroll"); tor.style.fontSize = "";
   const fs = parseFloat(cs.fontSize), minGap = fs * 0.3, setuma = fs * 3.2;
   const meas = document.createElement("span"); meas.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap"; tor.append(meas);
   const width = w => { heb(meas, w); return meas.getBoundingClientRect().width; };
