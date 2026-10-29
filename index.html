@@ -534,6 +534,9 @@ const PARSHIYOS = "Bereishis,Noach,Lech Lecha,Vayera,Chayei Sarah,Toldos,Vayetze
 PARSHIYOS.push("Vayakhel-Pekudei","Tazria-Metzora","Acharei Mos-Kedoshim","Behar-Bechukosai","Chukas-Balak","Matos-Masei","Nitzavim-Vayeilech");
 // the same parshiyos as the server's calendar spells them
 const HEBCAL = "Bereshit,Noach,Lech-Lecha,Vayera,Chayei Sara,Toldot,Vayetzei,Vayishlach,Vayeshev,Miketz,Vayigash,Vayechi,Shemot,Vaera,Bo,Beshalach,Yitro,Mishpatim,Terumah,Tetzaveh,Ki Tisa,Vayakhel,Pekudei,Vayikra,Tzav,Shmini,Tazria,Metzora,Achrei Mot,Kedoshim,Emor,Behar,Bechukotai,Bamidbar,Nasso,Beha'alotcha,Sh'lach,Korach,Chukat,Balak,Pinchas,Matot,Masei,Devarim,Vaetchanan,Eikev,Re'eh,Shoftim,Ki Teitzei,Ki Tavo,Nitzavim,Vayeilech,Ha'azinu,Vezot Haberakhah,Vayakhel-Pekudei,Tazria-Metzora,Achrei Mot-Kedoshim,Behar-Bechukotai,Chukat-Balak,Matot-Masei,Nitzavim-Vayeilech".split(",");
+// Hebrew names, in the same order as PARSHIYOS
+const PARSHIYOS_HE = "בראשית,נח,לך לך,וירא,חיי שרה,תולדות,ויצא,וישלח,וישב,מקץ,ויגש,ויחי,שמות,וארא,בא,בשלח,יתרו,משפטים,תרומה,תצוה,כי תשא,ויקהל,פקודי,ויקרא,צו,שמיני,תזריע,מצורע,אחרי מות,קדושים,אמור,בהר,בחוקותי,במדבר,נשא,בהעלותך,שלח,קרח,חוקת,בלק,פינחס,מטות,מסעי,דברים,ואתחנן,עקב,ראה,שופטים,כי תצא,כי תבוא,נצבים,וילך,האזינו,וזאת הברכה,ויקהל-פקודי,תזריע-מצורע,אחרי מות-קדושים,בהר-בחוקותי,חוקת-בלק,מטות-מסעי,נצבים-וילך".split(",");
+const heOf = p => PARSHIYOS_HE[PARSHIYOS.indexOf(p)] || "";
 const DEFAULT_PARSHA = "Vayera";
 let parshaPicked = false;
 
@@ -729,7 +732,7 @@ function render(){
     const part = PARTS.find(p=>p.k===l.part); if(!part) return;
     const li = document.createElement("li");
     li.innerHTML = `<span></span>`;
-    li.firstChild.textContent = `${part.t} · ${l.parsha}`;
+    li.firstChild.textContent = `${part.t} · ${l.parsha} · ${heOf(l.parsha)}`;
     li.insertAdjacentHTML("beforeend", l.awarded ? `<span class="chip done">Got +1</span>` : `<span class="chip">Waiting for admin</span>`);
     const pr = document.createElement("button"); pr.className = "primary"; pr.textContent = "📜 Practise";
     pr.onclick = () => openTikkun(l.parsha, l.part);
@@ -752,9 +755,9 @@ function render(){
 /* ---------- controls ---------- */
 // list them in reading order, with each double parsha right after its two parts
 PARSHIYOS.slice(0, 54).forEach(p => {
-  $("parsha").add(new Option(p, p));
+  $("parsha").add(new Option(`${p} · ${heOf(p)}`, p));
   const dbl = PARSHIYOS.slice(54).find(d => d.endsWith("-" + p));
-  if(dbl) $("parsha").add(new Option(dbl + " (together)", dbl));
+  if(dbl) $("parsha").add(new Option(`${dbl} · ${heOf(dbl)} (together)`, dbl));
 });
 $("parsha").value = DEFAULT_PARSHA;
 $("parsha").onchange = () => { parshaPicked = true; render(); };
@@ -1040,7 +1043,7 @@ async function openTikkun(parsha, part){
   const idx = PARSHIYOS.indexOf(parsha);
   const pi = PARTS.find(p => p.k === part);
   if(idx < 0 || !pi){ toast("Couldn't find that part"); return; }
-  $("tkTitle").textContent = `${pi.t} · ${parsha}`;
+  $("tkTitle").textContent = `${pi.t} · ${parsha} · ${heOf(parsha)}`;
   $("tkRef").textContent = "Loading…";
   $("tkNikud").innerHTML = ""; $("tkTorah").innerHTML = "";
   $("tikkun").hidden = false; document.body.style.overflow = "hidden";
