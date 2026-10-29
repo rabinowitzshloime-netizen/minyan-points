@@ -67,6 +67,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
 .part{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;padding:10px 12px}
+.p2start{font-size:11px;font-weight:700;color:var(--black);background:#ffc98a;border-radius:99px;padding:1px 8px}
 .pcount{font-size:12px;color:var(--ice-soft);font-variant-numeric:tabular-nums}
 .part .heb{font-size:15px;color:var(--ice-soft)}
 .part.taken{opacity:.55}
@@ -239,6 +240,8 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .tk-torah.measure .tk-scol,.tk-torah.measure .tk-frag{justify-content:flex-start;flex:0 0 auto}
 .tk-torah.measure .tk-sline{width:max-content}
 .tk-out{opacity:.28}
+.tk-pmark{font-family:var(--body);font-size:13px;font-weight:700;color:#8a3b12;background:#fbe3c7;border-radius:8px;padding:4px 10px;margin:.5em auto .3em;width:fit-content;line-height:1.4;direction:ltr}
+.tk-p2{box-shadow:inset 0 -3px 0 #d9822b}
 .tk-big{font-size:1.45em;line-height:0}
 .tk-small{font-size:.65em}
 .tk-sgap{display:inline-block;width:3.2em;flex:none}
@@ -713,8 +716,13 @@ function render(){
     const b = document.createElement("button");
     b.className = "part" + (t ? (t.boyId===me ? " mine" : " taken") : "") + (t&&t.awarded ? " done":"");
     b.innerHTML = `<span class="heb"></span><b></b><span class="pcount"></span><small class="pts"></small>`;
-    const n = (pesukimCount[PARSHIYOS.indexOf(parsha)] || {})[p.k];
+    const pc = pesukimCount[PARSHIYOS.indexOf(parsha)] || {}, n = pc[p.k];
     b.querySelector(".pcount").textContent = n ? `${n} pesukim` : "";
+    if(pc._second && pc._second[0] === p.k){
+      const sec2 = parsha.split("-").pop();
+      const m = document.createElement("span"); m.className = "p2start"; m.textContent = `${sec2} · ${heOf(sec2)} starts here`;
+      b.querySelector(".pcount").after(m);
+    }
     b.querySelector(".heb").textContent = p.h;
     b.querySelector("b").textContent = p.t;
     b.querySelector("small").textContent = t ? (t.boyId===me ? (t.awarded?"You leined it ✓":"You're saying this") : (boys[t.boyId]?.name||"Taken")) : "+1 point";
@@ -1072,12 +1080,14 @@ async function openTikkun(parsha, part){
     if(!sec){ $("tkRef").textContent = "This part isn't in the tikkun yet."; return; }
     $("tkRef").textContent = `${PART_HE[part]} · ${niceRef(sec.ref)}`;
     tkScroll = part !== "haftorah" && d.scroll ? d.scroll : null;
+    tkSecond = d.second ? { ref: d.second.ref, name: parsha.split("-").pop() } : null;
     drawTikkun(sec);
   }catch(e){ $("tkRef").textContent = "Couldn't load the tikkun. Check your internet and try again."; }
 }
 /* Lay out the Sefer Torah side like a real column: every line stretched to the
    same length, a gap for a setuma, and the rest of the line left empty for a pesucha. */
-let tkWords = [], tkVerses = [], tkLaidW = 0, tkScroll = null;
+let tkWords = [], tkVerses = [], tkLaidW = 0, tkScroll = null, tkSecond = null;
+const secondLabel = () => `${tkSecond.name} · ${heOf(tkSecond.name)} starts here`;
 /* The real Sefer Torah layout (from tikkun.io): exact lines, setumos, pesuchos and the shiros */
 function renderScroll(tor, W, force){
   const idx = {}, special = {};
@@ -1085,11 +1095,16 @@ function renderScroll(tor, W, force){
   const lines = tkScroll.filter(L => L.k.some(col => col.some(fr => fr.some(([w, r]) => r in idx))));
   tor.innerHTML = "";
   tor.classList.add("scroll");
-  let lastCol = null;
+  let lastCol = null, p2done = false;
   for(const L of lines){
     if(L.c !== lastCol){
       const h = document.createElement("div"); h.className = "tk-colmark"; h.textContent = `Column ${L.c} · line ${L.l}`;
       tor.append(h); lastCol = L.c;
+    }
+    const startsHere = tkSecond && L.k.some(col => col.some(fr => fr.some(([w, r]) => r === tkSecond.ref)));
+    if(startsHere && !tor.querySelector(".tk-pmark")){
+      const m = document.createElement("div"); m.className = "tk-pmark"; m.textContent = "▼ " + secondLabel() + " (on this line)";
+      tor.append(m);
     }
     const d = document.createElement("div"); d.className = "tk-sline" + (L.p ? " pet" : "") + (L.k.length > 1 ? " two" : "");
     L.k.forEach(col => {
@@ -1099,6 +1114,7 @@ function renderScroll(tor, W, force){
         fr.forEach(([w, r]) => {
           const sp = document.createElement("span"); heb(sp, special[r + "|" + w] || w);
           if(r in idx){ sp.className = "tk-v tk-w"; sp.dataset.i = idx[r]; } else sp.className = "tk-out";
+          if(tkSecond && r === tkSecond.ref && !p2done){ sp.classList.add("tk-p2"); p2done = true; }
           f.append(sp);
         });
         c.append(f);
@@ -1238,6 +1254,10 @@ function drawTikkun(sec){
   let pn = document.createElement("p");
   nik.append(pn);
   sec.verses.forEach(([ref, pointed, plain, brk], i) => {
+    if(tkSecond && ref === tkSecond.ref){
+      const m = document.createElement("div"); m.className = "tk-pmark"; m.textContent = "▼ " + secondLabel();
+      nik.append(m); pn = document.createElement("p"); nik.append(pn);
+    }
     const a = document.createElement("span"); a.className = "tk-v"; a.dataset.i = i;
     const n = document.createElement("span"); n.className = "tk-n"; n.textContent = ref.split(":")[1];
     a.append(n, heb(document.createElement("span"), pointed + " "));
