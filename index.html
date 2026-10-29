@@ -214,7 +214,8 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .tk-cols.one{grid-template-columns:1fr}
 .tk-col{background:#f6f0e1;color:#1a1408;border-radius:10px;padding:20px 22px;line-height:2.05;font-size:var(--tk);text-align:justify;box-shadow:inset 0 0 0 2px #d8ccb0;min-width:0;overflow-wrap:break-word}
 .tk-nikud{font-family:"Noto Serif Hebrew","SBL Hebrew","Taamey Frank CLM","Times New Roman",serif}
-.tk-torah{font-family:"Frank Ruhl Libre","Noto Serif Hebrew",serif;font-weight:700;font-size:calc(var(--tk) * 1.05)}
+@font-face{font-family:"Minyan Stam";src:url("/fonts/MinyanStam.woff2") format("woff2");font-display:swap;unicode-range:U+0020,U+05D0-05EA}
+.tk-torah{font-family:"Minyan Stam","Frank Ruhl Libre","Noto Serif Hebrew",serif;font-weight:400;font-synthesis:none;font-size:calc(var(--tk) * 1.1)}
 .tk-col p{margin:0 0 .6em}
 .tk-v{border-radius:6px;transition:background .2s}
 .tk-n{font-family:var(--body);font-size:.45em;color:#8a7a55;vertical-align:super;margin:0 .15em;font-weight:500}
