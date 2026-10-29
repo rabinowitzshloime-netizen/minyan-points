@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Minyan Points</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Frank+Ruhl+Libre:wght@500;700;900&family=Rubik:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Frank+Ruhl+Libre:wght@500;700;900&family=Noto+Serif+Hebrew:wght@400;600&family=Rubik:wght@400;500;700&display=swap">
 <style>
 html{height:100%}
 body{margin:0}
@@ -201,6 +201,29 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .seg button[aria-selected="true"]{color:var(--black);background:var(--ice);border-color:var(--ice);font-weight:700}
 .auth{display:flex;flex-direction:column;gap:10px}
 .auth input,.auth select{font-size:16px;padding:12px}
+/* ---------- tikkun ---------- */
+.tk{position:fixed;inset:0;z-index:20;background:var(--black);overflow:auto;padding:calc(12px + env(safe-area-inset-top,0px)) max(12px, env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(12px, env(safe-area-inset-left,0px))}
+.tk-inner{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.tk-top{display:flex;gap:12px;align-items:flex-start}
+.tk-top h2{font-size:30px}
+.tk-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.tk-modes{flex:1 1 300px;max-width:460px;grid-template-columns:repeat(3,1fr)}
+.tk-size{display:flex;gap:6px}
+.tk-tip{margin:0}
+.tk-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;--tk:28px}
+.tk-cols.one{grid-template-columns:1fr}
+.tk-col{background:#f6f0e1;color:#1a1408;border-radius:10px;padding:20px 22px;line-height:2.05;font-size:var(--tk);text-align:justify;box-shadow:inset 0 0 0 2px #d8ccb0;min-width:0;overflow-wrap:break-word}
+.tk-nikud{font-family:"Noto Serif Hebrew","SBL Hebrew","Taamey Frank CLM","Times New Roman",serif}
+.tk-torah{font-family:"Frank Ruhl Libre","Noto Serif Hebrew",serif;font-weight:700;font-size:calc(var(--tk) * 1.05)}
+.tk-col p{margin:0 0 .6em}
+.tk-v{border-radius:6px;transition:background .2s}
+.tk-n{font-family:var(--body);font-size:.45em;color:#8a7a55;vertical-align:super;margin:0 .15em;font-weight:500}
+.tk-gap{display:inline-block;width:3em}
+.tk-torah .tk-v{cursor:pointer}
+.tk-torah .tk-v:hover{background:rgba(127,160,255,.15)}
+.tk-torah .tk-v.peek{font-family:"Noto Serif Hebrew",serif;font-weight:400;background:rgba(255,214,90,.35)}
+.tk-v.hl{background:rgba(255,214,90,.35)}
+@media (max-width:760px){.tk-cols{grid-template-columns:1fr;--tk:24px}.tk-col{padding:14px 14px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -430,6 +453,34 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
     </div>
   </section>
 </div>
+<div class="tk" id="tikkun" hidden role="dialog" aria-modal="true" aria-labelledby="tkTitle">
+  <div class="tk-inner">
+    <div class="tk-top">
+      <div class="grow">
+        <div class="label" id="tkRef"></div>
+        <h2 id="tkTitle"></h2>
+      </div>
+      <button id="tkClose" aria-label="Close tikkun">✕ Close</button>
+    </div>
+    <div class="tk-bar">
+      <div class="seg tk-modes" role="tablist" aria-label="How to show it">
+        <button role="tab" data-tk="both">Both</button>
+        <button role="tab" data-tk="nikud">Nekudos &amp; trop</button>
+        <button role="tab" data-tk="torah">Like the Torah</button>
+      </div>
+      <div class="tk-size">
+        <button id="tkSmaller" aria-label="Smaller writing">A−</button>
+        <button id="tkBigger" aria-label="Bigger writing">A+</button>
+      </div>
+    </div>
+    <p class="note tk-tip" id="tkTip"></p>
+    <div class="tk-cols" id="tkCols">
+      <div class="tk-col tk-torah" id="tkTorah" dir="rtl" lang="he"></div>
+      <div class="tk-col tk-nikud" id="tkNikud" dir="rtl" lang="he"></div>
+    </div>
+    <p class="note" style="text-align:center;margin:8px 0 0">Text: Westminster Leningrad Codex. Aliyos: Hebcal. If anything looks different from your shul's tikkun, follow your shul.</p>
+  </div>
+</div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -644,6 +695,9 @@ function render(){
     li.innerHTML = `<span></span>`;
     li.firstChild.textContent = `${part.t} · ${l.parsha}`;
     li.insertAdjacentHTML("beforeend", l.awarded ? `<span class="chip done">Got +1</span>` : `<span class="chip">Waiting for admin</span>`);
+    const pr = document.createElement("button"); pr.className = "primary"; pr.textContent = "📜 Practise";
+    pr.onclick = () => openTikkun(l.parsha, l.part);
+    li.append(pr);
     my.append(li);
   });
 
@@ -931,6 +985,67 @@ $("postBox").addEventListener("paste", e => {
 
 $("bannerSee").onclick = () => showTab("news");
 $("bannerX").onclick = () => { const top = sortedPosts()[0]; if(top){ bannerClosed = top[1].at; try{ localStorage.setItem("mp_banner", bannerClosed); }catch(e){} } renderNews(); };
+
+/* ---------- tikkun ---------- */
+const PART_HE = {rishon:"ראשון", sheni:"שני", shlishi:"שלישי", revii:"רביעי", chamishi:"חמישי", shishi:"ששי", shevii:"שביעי", maftir:"מפטיר", haftorah:"הפטרה"};
+const tkCache = {};
+let tkMode = innerWidth > 760 ? "both" : "nikud", tkSize = 28;
+try{ tkMode = localStorage.getItem("mp_tkmode") || tkMode; tkSize = +localStorage.getItem("mp_tksize") || (innerWidth > 760 ? 28 : 24); }catch(e){}
+const niceRef = r => r.replace(/(\d+):(\d+)-\1:(\d+)/g, "$1:$2-$3");
+async function openTikkun(parsha, part){
+  const idx = PARSHIYOS.indexOf(parsha);
+  const pi = PARTS.find(p => p.k === part);
+  if(idx < 0 || !pi){ toast("Couldn't find that part"); return; }
+  $("tkTitle").textContent = `${pi.t} · ${parsha}`;
+  $("tkRef").textContent = "Loading…";
+  $("tkNikud").innerHTML = ""; $("tkTorah").innerHTML = "";
+  $("tikkun").hidden = false; document.body.style.overflow = "hidden";
+  try{
+    const d = tkCache[idx] || (tkCache[idx] = await (await fetch(`/tikkun/p${idx}.json`)).json());
+    const sec = d.parts[part];
+    if(!sec){ $("tkRef").textContent = "This part isn't in the tikkun yet."; return; }
+    $("tkRef").textContent = `${PART_HE[part]} · ${niceRef(sec.ref)}`;
+    drawTikkun(sec);
+  }catch(e){ $("tkRef").textContent = "Couldn't load the tikkun. Check your internet and try again."; }
+}
+function drawTikkun(sec){
+  const nik = $("tkNikud"), tor = $("tkTorah");
+  nik.innerHTML = ""; tor.innerHTML = "";
+  let pn = document.createElement("p"), pt = document.createElement("p");
+  nik.append(pn); tor.append(pt);
+  sec.verses.forEach(([ref, pointed, plain, brk], i) => {
+    const a = document.createElement("span"); a.className = "tk-v"; a.dataset.i = i;
+    const n = document.createElement("span"); n.className = "tk-n"; n.textContent = ref.split(":")[1];
+    a.append(n, document.createTextNode(pointed + " "));
+    pn.append(a);
+    const b = document.createElement("span"); b.className = "tk-v"; b.dataset.i = i; b.textContent = plain + " ";
+    b.onclick = () => { const on = b.classList.toggle("peek"); b.textContent = (on ? pointed : plain) + " "; };
+    pt.append(b);
+    if(brk === "p" && i < sec.verses.length - 1){ pn = document.createElement("p"); pt = document.createElement("p"); nik.append(pn); tor.append(pt); }
+    else if(brk === "s"){ pn.append(Object.assign(document.createElement("span"), {className:"tk-gap"})); pt.append(Object.assign(document.createElement("span"), {className:"tk-gap"})); }
+  });
+  // hovering a verse lights up the same verse on the other side
+  [nik, tor].forEach(col => {
+    col.onmouseover = e => { const v = e.target.closest(".tk-v"); document.querySelectorAll(".tk-v.hl").forEach(x => x.classList.remove("hl")); if(v && $("tkCols").classList.contains("both")) document.querySelectorAll(`.tk-v[data-i="${v.dataset.i}"]`).forEach(x => x.classList.add("hl")); };
+  });
+  setTkMode(tkMode);
+}
+function setTkMode(m){
+  tkMode = m; try{ localStorage.setItem("mp_tkmode", m); }catch(e){}
+  document.querySelectorAll("[data-tk]").forEach(b => b.setAttribute("aria-selected", b.dataset.tk === m));
+  $("tkNikud").hidden = m === "torah"; $("tkTorah").hidden = m === "nikud";
+  $("tkCols").className = "tk-cols " + (m === "both" ? "both" : "one");
+  $("tkCols").style.setProperty("--tk", tkSize + "px");
+  $("tkTip").textContent = m === "torah" ? "Test yourself! Stuck on a pasuk? Tap it to see the nekudos and trop, and tap again to hide them."
+    : m === "both" ? "Left: like the Sefer Torah. Right: with nekudos and trop. Point at a pasuk to see it on both sides."
+    : "Read along with the nekudos and trop. When you're ready, switch to \"Like the Torah\" to test yourself.";
+}
+document.querySelectorAll("[data-tk]").forEach(b => b.onclick = () => setTkMode(b.dataset.tk));
+$("tkBigger").onclick = () => { tkSize = Math.min(48, tkSize + 3); try{ localStorage.setItem("mp_tksize", tkSize); }catch(e){} setTkMode(tkMode); };
+$("tkSmaller").onclick = () => { tkSize = Math.max(16, tkSize - 3); try{ localStorage.setItem("mp_tksize", tkSize); }catch(e){} setTkMode(tkMode); };
+function closeTikkun(){ $("tikkun").hidden = true; document.body.style.overflow = ""; }
+$("tkClose").onclick = closeTikkun;
+addEventListener("keydown", e => { if(e.key === "Escape" && !$("tikkun").hidden) closeTikkun(); });
 
 /* ---------- tabs ---------- */
 let tab = "me";
