@@ -215,7 +215,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .tk-cols.one{grid-template-columns:1fr}
 .tk-col{background:#f6f0e1;color:#1a1408;border-radius:10px;padding:20px 22px;line-height:2.05;font-size:var(--tk);text-align:justify;box-shadow:inset 0 0 0 2px #d8ccb0;min-width:0;overflow-wrap:break-word}
 .tk-nikud{font-family:"Noto Serif Hebrew","SBL Hebrew","Taamey Frank CLM","Times New Roman",serif}
-@font-face{font-family:"Minyan Stam";src:url("/fonts/MinyanStam.woff2?v=2") format("woff2");font-display:swap;unicode-range:U+0020,U+05D0-05EA}
+@font-face{font-family:"Minyan Stam";src:url("/fonts/MinyanStam.woff2?v=3") format("woff2");font-display:swap;unicode-range:U+0020,U+05D0-05EA,U+E000-E02F}
 .tk-torah{font-family:"Minyan Stam","Frank Ruhl Libre","Noto Serif Hebrew",serif;font-weight:400;font-synthesis:none;font-size:calc(var(--tk) * 1.1)}
 .tk-col p{margin:0 0 .6em}
 .tk-v{border-radius:6px;transition:background .2s}
@@ -225,6 +225,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .tk-line{display:flex;gap:.3em;white-space:nowrap;justify-content:flex-start}
 .tk-line.full{justify-content:space-between}
 .tk-torah.scroll{line-height:1.6}
+.tk-torah.scroll .tk-sline,.tk-torah.scroll .tk-colmark{width:var(--sheet,100%);margin-inline:auto;max-width:100%}
 .tk-colmark{font-family:var(--body);font-size:12px;color:#8a7a55;text-align:center;margin:.6em 0 .2em;letter-spacing:.06em;text-transform:uppercase;line-height:1.4}
 .tk-colmark:first-child{margin-top:0}
 .tk-sline{display:flex;gap:2em;white-space:nowrap}
@@ -238,8 +239,6 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .tk-torah.measure .tk-scol,.tk-torah.measure .tk-frag{justify-content:flex-start;flex:0 0 auto}
 .tk-torah.measure .tk-sline{width:max-content}
 .tk-out{opacity:.28}
-.tk-st{display:inline-block;position:relative;color:transparent}
-.tk-st::after{content:attr(data-c);position:absolute;inset:0 0 auto auto;color:#1a1408;transform:scaleX(var(--k,1));transform-origin:right center;white-space:nowrap}
 .tk-big{font-size:1.45em;line-height:0}
 .tk-small{font-size:.65em}
 .tk-sgap{display:inline-block;width:3.2em;flex:none}
@@ -1082,43 +1081,60 @@ function renderScroll(tor, W, force){
   tor.querySelectorAll(".tk-sline").forEach(el => { widest = Math.max(widest, el.scrollWidth); });
   tor.classList.remove("measure");
   if(widest > W) tor.style.fontSize = Math.max(12, Math.floor(base * W / widest * 0.98)) + "px";
-  stretchLetters(tor, W);
+  // a real Torah column is only as wide as its longest line, so make ours the same
+  tor.classList.add("measure");
+  let natural = 0;
+  tor.querySelectorAll(".tk-sline").forEach(el => { natural = Math.max(natural, el.scrollWidth); });
+  tor.classList.remove("measure");
+  const sheet = Math.min(W, Math.ceil(natural * 1.04));
+  tor.style.setProperty("--sheet", sheet + "px");
+  stretchLetters(tor, sheet);
 }
-/* Like a sofer: fill each full line by stretching one or two of the "wide" letters near the end of the line */
-const WIDE = "אהלתםדר";
+/* Like a sofer: fill each full line by writing one to three letters long (the roof or base gets longer).
+   The font has 5 long versions of ד ה ל ת ם ר (private-use letters). */
+const LONG = "דהלתםר";
+const longOf = (ch, v) => String.fromCharCode(0xE000 + LONG.indexOf(ch) * 8 + v);
 function stretchLetters(tor, W){
   const fs = parseFloat(getComputedStyle(tor).fontSize);
+  const meas = document.createElement("span"); meas.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap"; tor.append(meas);
+  const wOf = t => { meas.textContent = t; return meas.getBoundingClientRect().width; };
+  const gain = {};   // extra width each long version adds, in px
+  for(const ch of LONG){ const base = wOf(ch); gain[ch] = [0,1,2,3,4].map(v => wOf(longOf(ch, v)) - base); }
+  meas.remove();
   tor.classList.add("measure");
   const jobs = [];
   tor.querySelectorAll(".tk-sline:not(.pet):not(.two)").forEach((line, li) => {
     if(line.querySelector(".tk-scol.setuma")) return;
     const extra = W - line.scrollWidth;
-    if(extra < fs * 0.6) return;
+    if(extra < fs * 0.3) return;
     const words = [...line.querySelectorAll(".tk-frag > span")].filter(w => !w.children.length);
-    // pick letters from the last few words, starting at the end of the line
+    const want = extra > fs * 2.6 ? 3 : extra > fs * 1.2 ? 2 : 1;
     const picks = [];
-    for(let k = words.length - 1; k >= Math.max(0, words.length - 4) && picks.length < (extra > fs * 2.2 ? 2 : 1); k--){
-      const t = words[k].textContent;
-      let pos = -1;
-      for(let j = t.length - 1; j >= 0; j--) if(WIDE.includes(t[j])){ pos = j; break; }
-      if(pos >= 0 && (li + k) % 3 !== 1 || pos >= 0 && picks.length === 0 && k <= words.length - 3) picks.push([words[k], pos]);
+    for(let pass = 0; pass < 2 && picks.length < want; pass++){
+      for(let k = words.length - 1; k >= Math.max(0, words.length - 6) && picks.length < want; k--){
+        if(picks.some(p => p[0] === words[k])) continue;
+        if(pass === 0 && (li + k) % 4 === 2) continue;   // skip some words so lines don't all look the same
+        const t = words[k].textContent;
+        let pos = -1;
+        for(let j = t.length - 1; j >= 0; j--) if(LONG.includes(t[j])){ pos = j; break; }
+        if(pos >= 0) picks.push([words[k], pos]);
+      }
     }
     if(picks.length) jobs.push({extra, picks});
   });
-  for(const {extra, picks} of jobs){
-    const share = extra * 0.6 / picks.length;
-    for(const [w, pos] of picks){
-      const t = w.textContent;
-      w.textContent = "";
-      const st = document.createElement("span"); st.className = "tk-st"; st.textContent = t[pos]; st.dataset.c = t[pos];
-      w.append(t.slice(0, pos), st, t.slice(pos + 1));
-      const lw = st.getBoundingClientRect().width;
-      const add = Math.min(share, lw * 1.15);
-      st.style.width = (lw + add) + "px";
-      st.style.setProperty("--k", ((lw + add) / lw).toFixed(3));
-    }
-  }
   tor.classList.remove("measure");
+  for(const {extra, picks} of jobs){
+    let left = extra * 0.9;
+    picks.forEach(([w, pos], n) => {
+      const ch = w.textContent[pos], target = left / (picks.length - n);
+      let v = -1;
+      gain[ch].forEach((g, i) => { if(g <= target) v = i; });
+      if(v < 0) return;
+      left -= gain[ch][v];
+      const t = w.textContent;
+      w.textContent = t.slice(0, pos) + longOf(ch, v) + t.slice(pos + 1);
+    });
+  }
 }
 // write Hebrew into an element: {x} is a big letter, [x] a small or hanging letter (like in the Sefer Torah)
 function heb(el, str){
