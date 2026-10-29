@@ -225,8 +225,13 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .tk-torah{text-align:right;line-height:1.75}
 .tk-line{display:flex;gap:.3em;white-space:nowrap;justify-content:flex-start}
 .tk-line.full{justify-content:space-between}
-.tk-torah.scroll{line-height:1.6}
-.tk-torah.scroll .tk-sline,.tk-torah.scroll .tk-colmark{width:var(--sheet,100%);margin-inline:auto;max-width:100%}
+.tk-col.scroll{line-height:1.6}
+.tk-col.scroll .tk-sline,.tk-col.scroll .tk-colmark{width:var(--sheet,100%);margin-inline:auto;max-width:100%}
+.tk-col.scroll .tk-sline{height:var(--row,auto);align-items:center}
+.tk-col.scroll .tk-colmark{height:22px;margin:8px auto 2px;line-height:22px}
+.tk-col.scroll .tk-colmark:first-child{margin-top:0}
+.tk-col.scroll .tk-sline:has(.tk-p2){margin-top:18px}
+.tk-nikud.scroll .tk-sline{line-height:1.2}
 .tk-colmark{font-family:var(--body);font-size:12px;color:#8a7a55;text-align:center;margin:.6em 0 .2em;letter-spacing:.06em;text-transform:uppercase;line-height:1.4}
 .tk-colmark:first-child{margin-top:0}
 .tk-sline{display:flex;gap:2em;white-space:nowrap}
@@ -237,8 +242,8 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .tk-frag{display:flex;justify-content:space-between;gap:.3em;flex:1}
 .tk-scol.setuma .tk-frag{flex:0 1 auto;justify-content:flex-start}
 .tk-sline.pet .tk-scol,.tk-sline.pet .tk-frag{justify-content:flex-start;flex:0 1 auto}
-.tk-torah.measure .tk-scol,.tk-torah.measure .tk-frag{justify-content:flex-start;flex:0 0 auto}
-.tk-torah.measure .tk-sline{width:max-content}
+.tk-col.measure .tk-scol,.tk-col.measure .tk-frag{justify-content:flex-start;flex:0 0 auto}
+.tk-col.measure .tk-sline{width:max-content}
 .tk-out{opacity:.28}
 .tk-p2{position:relative;background:#ffd9a8;border-radius:5px;box-shadow:0 0 0 2px #ffd9a8}
 .tk-p2::before{content:attr(data-label);position:absolute;bottom:calc(100% + 2px);right:0;font-family:var(--body);font-size:11px;font-weight:700;line-height:1.5;color:#fff;background:#d9822b;border-radius:6px;padding:0 7px;white-space:nowrap;direction:ltr;pointer-events:none;z-index:2}
@@ -1110,51 +1115,63 @@ async function openTikkun(parsha, part){
 let tkWords = [], tkVerses = [], tkLaidW = 0, tkScroll = null, tkSecond = null;
 const secondLabel = () => `${tkSecond.name} · ${heOf(tkSecond.name)} starts here`;
 /* The real Sefer Torah layout (from tikkun.io): exact lines, setumos, pesuchos and the shiros */
-function renderScroll(tor, W, force){
+function renderScroll(){
+  const tor = $("tkTorah"), nik = $("tkNikud");
   const idx = {}, special = {};
   tkVerses.forEach((v, i) => { idx[v[0]] = i; v[2].split(" ").filter(w => /[{[]/.test(w)).forEach(w => special[v[0] + "|" + w.replace(/[{}[\]]/g, "")] = w); });
   const lines = tkScroll.filter(L => L.k.some(col => col.some(fr => fr.some(([w, r]) => r in idx))));
-  tor.innerHTML = "";
-  tor.classList.add("scroll");
-  let lastCol = null, p2done = false;
-  for(const L of lines){
-    if(L.c !== lastCol){
-      const h = document.createElement("div"); h.className = "tk-colmark"; h.textContent = `Column ${L.c} · line ${L.l}`;
-      tor.append(h); lastCol = L.c;
-    }
-    const d = document.createElement("div"); d.className = "tk-sline" + (L.p ? " pet" : "") + (L.k.length > 1 ? " two" : "");
-    L.k.forEach(col => {
-      const c = document.createElement("div"); c.className = "tk-scol" + (col.length > 1 ? " setuma" : "");
-      col.forEach(fr => {
-        const f = document.createElement("span"); f.className = "tk-frag";
-        fr.forEach(([w, r]) => {
-          const sp = document.createElement("span"); heb(sp, special[r + "|" + w] || w);
-          if(r in idx){ sp.className = "tk-v tk-w"; sp.dataset.i = idx[r]; } else sp.className = "tk-out";
-          if(tkSecond && r === tkSecond.ref && !p2done){ sp.classList.add("tk-p2"); sp.dataset.label = secondLabel(); p2done = true; }
-          f.append(sp);
+  // draw one side ("k" = Sefer Torah letters, "n" = with nekudos and trop) line by line
+  const draw = (box, key) => {
+    box.innerHTML = ""; box.classList.add("scroll"); box.style.fontSize = "";
+    let lastCol = null, p2done = false, lastRef = null;
+    for(const L of lines){
+      if(L.c !== lastCol){
+        const h = document.createElement("div"); h.className = "tk-colmark"; h.textContent = `Column ${L.c} · line ${L.l}`;
+        box.append(h); lastCol = L.c;
+      }
+      const cols = L[key] || L.k;
+      const d = document.createElement("div"); d.className = "tk-sline" + (L.p ? " pet" : "") + (cols.length > 1 ? " two" : "");
+      cols.forEach(col => {
+        const c = document.createElement("div"); c.className = "tk-scol" + (col.length > 1 ? " setuma" : "");
+        col.forEach(fr => {
+          const f = document.createElement("span"); f.className = "tk-frag";
+          fr.forEach(([w, r]) => {
+            if(key === "n" && w === "׀"){ const prev = f.lastElementChild; if(prev){ prev.append(" ׀"); return; } }
+            const sp = document.createElement("span");
+            if(key === "n"){
+              if(r !== lastRef && r in idx){ const n = document.createElement("span"); n.className = "tk-n"; n.textContent = r.split(":")[1]; sp.append(n); }
+              sp.append(w);
+            } else heb(sp, special[r + "|" + w] || w);
+            lastRef = r;
+            if(r in idx){ sp.className = "tk-v " + (key === "k" ? "tk-w" : "tk-wn"); sp.dataset.i = idx[r]; } else sp.className = "tk-out";
+            if(tkSecond && r === tkSecond.ref && !p2done){ sp.classList.add("tk-p2"); sp.dataset.label = secondLabel(); p2done = true; }
+            f.append(sp);
+          });
+          c.append(f);
         });
-        c.append(f);
+        d.append(c);
       });
-      d.append(c);
-    });
-    tor.append(d);
-  }
-  // shrink the writing if the longest line doesn't fit
-  tor.style.fontSize = "";
-  const base = parseFloat(getComputedStyle(tor).fontSize);
-  tor.classList.add("measure");
-  let widest = 0;
-  tor.querySelectorAll(".tk-sline").forEach(el => { widest = Math.max(widest, el.scrollWidth); });
-  tor.classList.remove("measure");
-  if(widest > W) tor.style.fontSize = Math.max(12, Math.floor(base * W / widest * 0.98)) + "px";
-  // a real Torah column is only as wide as its longest line, so make ours the same
-  tor.classList.add("measure");
-  let natural = 0;
-  tor.querySelectorAll(".tk-sline").forEach(el => { natural = Math.max(natural, el.scrollWidth); });
-  tor.classList.remove("measure");
-  const sheet = Math.min(W, Math.ceil(natural * 1.04));
-  tor.style.setProperty("--sheet", sheet + "px");
-  stretchLetters(tor, sheet);
+      box.append(d);
+    }
+  };
+  // shrink the writing if the longest line doesn't fit, and make the column only as wide as its longest line
+  const fit = box => {
+    const cs = getComputedStyle(box);
+    const W = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const widest = () => { box.classList.add("measure"); let m = 0; box.querySelectorAll(".tk-sline").forEach(el => { m = Math.max(m, el.scrollWidth); }); box.classList.remove("measure"); return m; };
+    const base = parseFloat(cs.fontSize), w1 = widest();
+    if(w1 > W) box.style.fontSize = Math.max(11, Math.floor(base * W / w1 * 0.98)) + "px";
+    const sheet = Math.min(W, Math.ceil(widest() * 1.04));
+    box.style.setProperty("--sheet", sheet + "px");
+    return sheet;
+  };
+  draw(tor, "k"); draw(nik, "n");
+  if(!tor.hidden) stretchLetters(tor, fit(tor));
+  if(!nik.hidden) fit(nik);
+  // every line the same height on both sides, so each line sits level with its partner
+  const rowOf = box => box.hidden ? 0 : parseFloat(getComputedStyle(box).fontSize) * (box === nik ? 1.95 : 1.6);
+  const row = Math.ceil(Math.max(rowOf(tor), rowOf(nik)));
+  [tor, nik].forEach(b => b.style.setProperty("--row", row + "px"));
 }
 /* Like a sofer: fill each full line by writing one to three letters long (the roof or base gets longer).
    The font has 5 long versions of ד ה ל ת ם ר (private-use letters). */
@@ -1212,15 +1229,22 @@ function heb(el, str){
   }
   return el;
 }
+let tkLaidKey = "";
 function layoutTorah(force){
   const tor = $("tkTorah");
+  if(tkScroll){
+    const shown = [tor, $("tkNikud")].filter(e => !e.hidden);
+    const key = shown.map(e => e.id + e.clientWidth).join("|");
+    if(!shown.length || shown.some(e => e.clientWidth <= 0) || (!force && key === tkLaidKey)) return;
+    tkLaidKey = key;
+    renderScroll(); return;
+  }
   if(tor.hidden || !tkWords.length) return;
   const cs = getComputedStyle(tor);
   const W = tor.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   if(W <= 0 || (!force && Math.abs(W - tkLaidW) < 1)) return;
   tkLaidW = W;
-  if(tkScroll){ renderScroll(tor, W, force); alignMarks(); return; }
-  tor.classList.remove("scroll"); tor.style.fontSize = "";
+  tor.classList.remove("scroll"); tor.style.fontSize = ""; tor.style.removeProperty("--row");
   const fs = parseFloat(cs.fontSize), minGap = fs * 0.3, setuma = fs * 3.2;
   const meas = document.createElement("span"); meas.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap"; tor.append(meas);
   const width = w => { heb(meas, w); return meas.getBoundingClientRect().width; };
@@ -1268,7 +1292,8 @@ let tkResize; addEventListener("resize", () => { clearTimeout(tkResize); tkResiz
 if(document.fonts) document.fonts.ready.then(() => layoutTorah(true));
 function drawTikkun(sec){
   const nik = $("tkNikud"), tor = $("tkTorah");
-  nik.innerHTML = ""; tor.innerHTML = ""; tkWords = []; tkLaidW = 0;
+  nik.innerHTML = ""; tor.innerHTML = ""; tkWords = []; tkLaidW = 0; tkLaidKey = "";
+  [nik, tor].forEach(b => { b.classList.remove("scroll"); b.style.fontSize = ""; b.style.removeProperty("--row"); b.style.removeProperty("--sheet"); });
   let pn = document.createElement("p");
   nik.append(pn);
   sec.verses.forEach(([ref, pointed, plain, brk], i) => {
