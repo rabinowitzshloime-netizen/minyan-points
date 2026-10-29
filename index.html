@@ -755,7 +755,7 @@ function render(){
 /* ---------- controls ---------- */
 // list them in reading order, with each double parsha right after its two parts
 PARSHIYOS.slice(0, 54).forEach(p => {
-  $("parsha").add(new Option(`${p} · ${heOf(p)}`, p));
+  $("parsha").add(new Option(`${p} · ${heOf(p)}` + (p === "Vezos Haberachah" ? " (Simchas Torah)" : ""), p));
   const dbl = PARSHIYOS.slice(54).find(d => d.endsWith("-" + p));
   if(dbl) $("parsha").add(new Option(`${dbl} · ${heOf(dbl)} (together)`, dbl));
 });
