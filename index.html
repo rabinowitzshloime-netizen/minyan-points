@@ -67,6 +67,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
 .part{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;padding:10px 12px}
+.pcount{font-size:12px;color:var(--ice-soft);font-variant-numeric:tabular-nums}
 .part .heb{font-size:15px;color:var(--ice-soft)}
 .part.taken{opacity:.55}
 .part.taken small{color:var(--muted)}
@@ -533,7 +534,7 @@ const PARSHIYOS = "Bereishis,Noach,Lech Lecha,Vayera,Chayei Sarah,Toldos,Vayetze
 const DEFAULT_PARSHA = "Vayera"; // Shabbos 31 Oct 2026
 
 const $ = id => document.getElementById(id);
-let boys = {}, pts = {}, leins = {}, week = "";
+let boys = {}, pts = {}, leins = {}, week = "", pesukimCount = {};
 let loaded = false;
 let me = null, adminCode = "", tok = "";
 try { tok = sessionStorage.getItem("mp_tok") || ""; adminCode = sessionStorage.getItem("mp_code") || ""; localStorage.removeItem("mp_me"); localStorage.removeItem("mp_code"); localStorage.removeItem("mp_tok"); } catch(e){}
@@ -701,7 +702,9 @@ function render(){
     const t = takenId && leins[takenId];
     const b = document.createElement("button");
     b.className = "part" + (t ? (t.boyId===me ? " mine" : " taken") : "") + (t&&t.awarded ? " done":"");
-    b.innerHTML = `<span class="heb"></span><b></b><small class="pts"></small>`;
+    b.innerHTML = `<span class="heb"></span><b></b><span class="pcount"></span><small class="pts"></small>`;
+    const n = (pesukimCount[PARSHIYOS.indexOf(parsha)] || {})[p.k];
+    b.querySelector(".pcount").textContent = n ? `${n} pesukim` : "";
     b.querySelector(".heb").textContent = p.h;
     b.querySelector("b").textContent = p.t;
     b.querySelector("small").textContent = t ? (t.boyId===me ? (t.awarded?"You leined it ✓":"You're saying this") : (boys[t.boyId]?.name||"Taken")) : "+1 point";
@@ -1012,6 +1015,9 @@ $("postBox").addEventListener("paste", e => {
 
 $("bannerSee").onclick = () => showTab("news");
 $("bannerX").onclick = () => { const top = sortedPosts()[0]; if(top){ bannerClosed = top[1].at; try{ localStorage.setItem("mp_banner", bannerClosed); }catch(e){} } renderNews(); };
+
+/* how many pesukim each part has (loaded once) */
+fetch("/tikkun/counts.json").then(r => r.ok ? r.json() : {}).then(j => { pesukimCount = j || {}; render(); }).catch(() => {});
 
 /* ---------- tikkun ---------- */
 const PART_HE = {rishon:"ראשון", sheni:"שני", shlishi:"שלישי", revii:"רביעי", chamishi:"חמישי", shishi:"ששי", shevii:"שביעי", maftir:"מפטיר", haftorah:"הפטרה"};
