@@ -5,7 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#16306e">
 <link rel="icon" type="image/png" href="/favicon.png">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Minyan Points">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Minyan Points</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Frank+Ruhl+Libre:wght@500;700;900&family=Noto+Serif+Hebrew:wght@400;600&family=Rubik:wght@400;500;700&display=swap">
@@ -262,6 +267,8 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .tk-pk-txt{font-family:"Noto Serif Hebrew",serif;font-size:26px;line-height:1.9}
 .tk-v.hl{background:rgba(255,214,90,.35)}
 @media (max-width:760px){.tk-cols{grid-template-columns:1fr;--tk:24px}.tk-col{padding:14px 14px}}
+.install{background:transparent;border:2px solid var(--ice);color:var(--ice-soft);font-weight:700}
+.welcome-card .install{align-self:center}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -316,6 +323,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
       <p class="note" style="margin:-4px 0 0">Your <b>password</b> is your secret, at least 4 characters. Don't tell anyone, and remember it!</p>
       <button class="primary" type="submit">Set up my login</button>
     </form>
+    <button type="button" id="installBtn" class="install" hidden>📲 Get the app</button>
     <button type="button" id="adminTabBtn" class="ghost" style="align-self:center">🔒 Admin</button>
   </div>
 </div>
@@ -354,7 +362,10 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
         <div class="label">Shalom</div>
         <h2 id="hi">Hi, <span id="myName"></span></h2>
       </div>
-      <button id="switchBtn">Log out</button>
+      <div class="row" style="gap:8px">
+        <button id="installBtn2" class="install" hidden>📲 Get the app</button>
+        <button id="switchBtn">Log out</button>
+      </div>
     </div>
     <div class="score">
       <span class="big" id="myPts">0</span>
@@ -518,6 +529,18 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
     </div>
     <div class="tk-peek" id="tkPeek" hidden><div class="tk-pk-ref"></div><div class="tk-pk-txt" dir="rtl" lang="he"></div></div>
     <p class="note" style="text-align:center;margin:8px 0 0">Text: Westminster Leningrad Codex. Aliyos: Hebcal. If anything looks different from your shul's tikkun, follow your shul.</p>
+  </div>
+</div>
+<div class="tk" id="iosHelp" hidden role="dialog" aria-modal="true" aria-labelledby="iosH" style="background:rgba(5,10,30,.85)">
+  <div class="welcome-card" style="margin:12vh auto 0">
+    <h2 id="iosH">Get the app on your iPhone</h2>
+    <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;line-height:1.5">
+      <li>Open this page in <b>Safari</b>.</li>
+      <li>Tap the <b>Share</b> button (the square with an arrow up).</li>
+      <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+      <li>Tap <b>Add</b>. The Minyan Points icon is now on your home screen. 🎉</li>
+    </ol>
+    <button class="primary" id="iosClose">Got it</button>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -1332,6 +1355,22 @@ $("tkSmaller").onclick = () => { tkSize = Math.max(16, tkSize - 3); try{ localSt
 function closeTikkun(){ $("tikkun").hidden = true; document.body.style.overflow = ""; }
 $("tkClose").onclick = closeTikkun;
 addEventListener("keydown", e => { if(e.key === "Escape" && !$("tikkun").hidden) closeTikkun(); });
+
+/* ---------- install as an app ---------- */
+if("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+let installEvt = null;
+const isApp = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+function showInstall(){ const on = !isApp() && (!!installEvt || isIOS()); ["installBtn", "installBtn2"].forEach(id => $(id).hidden = !on); }
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; showInstall(); });
+addEventListener("appinstalled", () => { installEvt = null; showInstall(); toast("The app is on your home screen 🎉"); });
+async function doInstall(){
+  if(installEvt){ installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); installEvt = null; showInstall(); if(r && r.outcome === "accepted") toast("Installing… 📲"); return; }
+  if(isIOS()) $("iosHelp").hidden = false;
+}
+["installBtn", "installBtn2"].forEach(id => $(id).onclick = doInstall);
+$("iosClose").onclick = () => $("iosHelp").hidden = true;
+showInstall();
 
 /* ---------- tabs ---------- */
 let tab = "me";
