@@ -240,8 +240,10 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 .tk-torah.measure .tk-scol,.tk-torah.measure .tk-frag{justify-content:flex-start;flex:0 0 auto}
 .tk-torah.measure .tk-sline{width:max-content}
 .tk-out{opacity:.28}
-.tk-pmark{font-family:var(--body);font-size:13px;font-weight:700;color:#8a3b12;background:#fbe3c7;border-radius:8px;padding:4px 10px;margin:.5em auto .3em;width:fit-content;line-height:1.4;direction:ltr}
-.tk-p2{box-shadow:inset 0 -3px 0 #d9822b}
+.tk-p2{position:relative;background:#ffd9a8;border-radius:5px;box-shadow:0 0 0 2px #ffd9a8}
+.tk-p2:hover::before,.tk-p2.show::before{content:attr(data-label);position:absolute;bottom:calc(100% + 2px);right:0;font-family:var(--body);font-size:11px;font-weight:700;line-height:1.5;color:#fff;background:#d9822b;border-radius:6px;padding:0 7px;white-space:nowrap;direction:ltr;pointer-events:none;z-index:2}
+.tk-n.tk-p2{font-size:.55em;color:#8a3b12;padding:0 .2em}
+.tk-p2v{background:rgba(255,217,168,.45);border-radius:6px}
 .tk-big{font-size:1.45em;line-height:0}
 .tk-small{font-size:.65em}
 .tk-sgap{display:inline-block;width:3.2em;flex:none}
@@ -1079,6 +1081,7 @@ async function openTikkun(parsha, part){
     const sec = d.parts[part];
     if(!sec){ $("tkRef").textContent = "This part isn't in the tikkun yet."; return; }
     $("tkRef").textContent = `${PART_HE[part]} · ${niceRef(sec.ref)}`;
+    if(d.second && sec.verses.some(v => v[0] === d.second.ref)) $("tkRef").textContent += ` · ${parsha.split("-").pop()} starts at the orange word`;
     tkScroll = part !== "haftorah" && d.scroll ? d.scroll : null;
     tkSecond = d.second ? { ref: d.second.ref, name: parsha.split("-").pop() } : null;
     drawTikkun(sec);
@@ -1101,11 +1104,6 @@ function renderScroll(tor, W, force){
       const h = document.createElement("div"); h.className = "tk-colmark"; h.textContent = `Column ${L.c} · line ${L.l}`;
       tor.append(h); lastCol = L.c;
     }
-    const startsHere = tkSecond && L.k.some(col => col.some(fr => fr.some(([w, r]) => r === tkSecond.ref)));
-    if(startsHere && !tor.querySelector(".tk-pmark")){
-      const m = document.createElement("div"); m.className = "tk-pmark"; m.textContent = "▼ " + secondLabel() + " (on this line)";
-      tor.append(m);
-    }
     const d = document.createElement("div"); d.className = "tk-sline" + (L.p ? " pet" : "") + (L.k.length > 1 ? " two" : "");
     L.k.forEach(col => {
       const c = document.createElement("div"); c.className = "tk-scol" + (col.length > 1 ? " setuma" : "");
@@ -1114,7 +1112,7 @@ function renderScroll(tor, W, force){
         fr.forEach(([w, r]) => {
           const sp = document.createElement("span"); heb(sp, special[r + "|" + w] || w);
           if(r in idx){ sp.className = "tk-v tk-w"; sp.dataset.i = idx[r]; } else sp.className = "tk-out";
-          if(tkSecond && r === tkSecond.ref && !p2done){ sp.classList.add("tk-p2"); p2done = true; }
+          if(tkSecond && r === tkSecond.ref && !p2done){ sp.classList.add("tk-p2"); sp.dataset.label = secondLabel(); p2done = true; }
           f.append(sp);
         });
         c.append(f);
@@ -1231,14 +1229,7 @@ function layoutTorah(force){
   }
 }
 /* In "Both", line up the "second parsha starts here" markers on the two sides */
-function alignMarks(){
-  const a = document.querySelector("#tkTorah .tk-pmark"), b = document.querySelector("#tkNikud .tk-pmark");
-  [a, b].forEach(m => m && (m.style.marginTop = ""));
-  if(!a || !b || $("tkTorah").hidden || $("tkNikud").hidden) return;
-  const diff = a.getBoundingClientRect().top - b.getBoundingClientRect().top;
-  if(Math.abs(diff) < 2) return;
-  (diff > 0 ? b : a).style.marginTop = `calc(.5em + ${Math.abs(diff)}px)`;
-}
+function alignMarks(){}
 function showPeek(i, x, y){
   const v = tkVerses[i]; if(!v) return;
   const b = $("tkPeek");
@@ -1263,13 +1254,11 @@ function drawTikkun(sec){
   let pn = document.createElement("p");
   nik.append(pn);
   sec.verses.forEach(([ref, pointed, plain, brk], i) => {
-    if(tkSecond && ref === tkSecond.ref){
-      const m = document.createElement("div"); m.className = "tk-pmark"; m.textContent = "▼ " + secondLabel();
-      nik.append(m); pn = document.createElement("p"); nik.append(pn);
-    }
+
     const a = document.createElement("span"); a.className = "tk-v"; a.dataset.i = i;
     const n = document.createElement("span"); n.className = "tk-n"; n.textContent = ref.split(":")[1];
     a.append(n, heb(document.createElement("span"), pointed + " "));
+    if(tkSecond && ref === tkSecond.ref){ a.classList.add("tk-p2v"); n.classList.add("tk-p2"); n.dataset.label = secondLabel(); }
     pn.append(a);
     plain.split(" ").filter(Boolean).forEach(w => tkWords.push({w, i}));
     if(brk === "p" && i < sec.verses.length - 1){ pn = document.createElement("p"); nik.append(pn); tkWords.push({p:1}); }
