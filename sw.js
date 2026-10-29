@@ -1,6 +1,6 @@
 // Minyan Points app: keeps the app's files on the phone so it opens fast.
 // Points, logins and news always come fresh from the server (never stored here).
-const CACHE = "minyan-v2";
+const CACHE = "minyan-v3";
 const SHELL = ["/", "/logo.png", "/icon-192.png", "/icon-512.png", "/fonts/MinyanStam.woff2?v=3", "/tikkun/counts.json"];
 
 self.addEventListener("install", e => {
