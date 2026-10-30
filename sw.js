@@ -1,6 +1,6 @@
 // Minyan Points app: keeps the app's files on the phone so it opens fast.
 // Points, logins and news always come fresh from the server (never stored here).
-const CACHE = "minyan-v3";
+const CACHE = "minyan-v4";
 const SHELL = ["/", "/logo.png", "/icon-192.png", "/icon-512.png", "/fonts/MinyanStam.woff2?v=3", "/tikkun/counts.json"];
 
 self.addEventListener("install", e => {
@@ -18,9 +18,9 @@ self.addEventListener("fetch", e => {
     e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put("/", c)); return r; }).catch(() => caches.match("/")));
     return;
   }
-  // everything else (fonts, pictures, tikkun files): saved copy first, then fetch and save
-  e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request).then(r => {
-    if (r.ok) { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); }
-    return r;
+  // everything else: show the saved copy straight away, and fetch a fresh one in the background for next time
+  e.respondWith(caches.open(CACHE).then(c => c.match(e.request).then(hit => {
+    const fresh = fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => hit);
+    return hit || fresh;
   })));
 });

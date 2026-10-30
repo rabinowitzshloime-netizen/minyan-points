@@ -1357,7 +1357,25 @@ $("tkClose").onclick = closeTikkun;
 addEventListener("keydown", e => { if(e.key === "Escape" && !$("tikkun").hidden) closeTikkun(); });
 
 /* ---------- install as an app ---------- */
-if("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+// Updates: the app checks for a new version when it opens and every few minutes.
+// When there is one, it switches over by itself, so closing and opening the app is enough.
+if("serviceWorker" in navigator){
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then(reg => {
+      reg.update().catch(() => {});
+      setInterval(() => reg.update().catch(() => {}), 5 * 60 * 1000);
+      document.addEventListener("visibilitychange", () => { if(!document.hidden) reg.update().catch(() => {}); });
+    }).catch(() => {});
+  });
+  let reloaded = false;
+  const hadOld = !!navigator.serviceWorker.controller;   // first visit: nothing to update
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if(reloaded || !hadOld) return; reloaded = true;
+    // only reload if nobody is in the middle of typing a post or a password
+    const busy = document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName) || ($("postBody") && $("postBody").textContent.trim());
+    if(!busy) location.reload(); else toast("A new version is ready. Close and open the app to get it.");
+  });
+}
 let installEvt = null;
 const isApp = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
