@@ -269,6 +269,7 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
 @media (max-width:760px){.tk-cols{grid-template-columns:1fr;--tk:24px}.tk-col{padding:14px 14px}}
 .install{background:transparent;border:2px solid var(--ice);color:var(--ice-soft);font-weight:700}
 .welcome-card .install{align-self:center}
+.updbar{position:fixed;left:50%;transform:translateX(-50%);top:calc(12px + env(safe-area-inset-top,0px));z-index:40;width:min(560px,calc(100% - 24px));display:flex;gap:10px;align-items:center;padding:12px 14px;background:var(--navy-2);border:2px solid var(--ice);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.5);font-weight:500}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -542,6 +543,10 @@ textarea:focus-visible,.editor:focus-visible{outline:2px solid var(--ice);outlin
     </ol>
     <button class="primary" id="iosClose">Got it</button>
   </div>
+</div>
+<div class="updbar" id="updBar" hidden role="status">
+  <span class="grow" id="updText">A new version of the app is ready.</span>
+  <button class="primary" id="updNow">🔄 Update now</button>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -1357,6 +1362,7 @@ $("tkClose").onclick = closeTikkun;
 addEventListener("keydown", e => { if(e.key === "Escape" && !$("tikkun").hidden) closeTikkun(); });
 
 /* ---------- install as an app ---------- */
+$("updNow").onclick = () => { $("updText").textContent = "Updating…"; location.reload(); };
 // Updates: the app checks for a new version when it opens and every few minutes.
 // When there is one, it switches over by itself, so closing and opening the app is enough.
 if("serviceWorker" in navigator){
@@ -1371,9 +1377,16 @@ if("serviceWorker" in navigator){
   const hadOld = !!navigator.serviceWorker.controller;   // first visit: nothing to update
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if(reloaded || !hadOld) return; reloaded = true;
-    // only reload if nobody is in the middle of typing a post or a password
-    const busy = document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName) || ($("postBody") && $("postBody").textContent.trim());
-    if(!busy) location.reload(); else toast("A new version is ready. Close and open the app to get it.");
+    // tell them first, then update when they tap the button (or by itself after 10 seconds if they're not typing)
+    $("updBar").hidden = false;
+    let left = 10;
+    const busy = () => document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName) || ($("postBody") && $("postBody").textContent.trim());
+    const tick = () => {
+      if(busy()){ $("updText").textContent = "A new version of the app is ready. Tap Update when you've finished."; return; }
+      $("updText").textContent = `A new version of the app is ready. Updating in ${left}…`;
+      if(left-- <= 0){ clearInterval(t); $("updText").textContent = "Updating…"; location.reload(); }
+    };
+    const t = setInterval(tick, 1000); tick();
   });
 }
 let installEvt = null;
