@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@upstash/redis": "1.34.3",
-    "@hebcal/core": "6.14.2"
+    "@hebcal/core": "6.14.2",
+    "web-push": "3.6.7"
   }
 }

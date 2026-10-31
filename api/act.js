@@ -1,5 +1,6 @@
 import { redis, getState, isAdmin, weekKey, RULES, PARTS, WEEK_MAX, BONUS, publicState, sessionUser, newSession, hashPw, checkPw, cleanUser, USER_OK, upcomingDates, todayYmd } from "../lib/shared.js";
 import { cleanHtml, imgSrcs, cutHtml } from "../lib/clean.js";
+import { vapid, subKey, pushAll, smsAll, cleanPhone, smsReady } from "../lib/notify.js";
 
 const ADMIN_USER = cleanUser(process.env.ADMIN_USER || "admin");
 const id = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -111,6 +112,28 @@ export default async function handler(req, res) {
         await redis.hset("v:" + b.postId, { [b.boyId]: n });
         break;
       }
+      /* ----- notifications ----- */
+      case "pushKey": { out.key = (await vapid()).publicKey; break; }
+      case "pushSub": {
+        mustLogIn();
+        const sub = b.sub || {};
+        if (typeof sub.endpoint !== "string" || !/^https:\/\//.test(sub.endpoint) || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) no("Couldn't turn on notifications.");
+        const clean = { endpoint: sub.endpoint.slice(0, 1000), keys: { p256dh: String(sub.keys.p256dh).slice(0, 200), auth: String(sub.keys.auth).slice(0, 100) } };
+        await redis.hset("push", { [subKey(clean.endpoint)]: { sub: clean, boyId: me } });
+        break;
+      }
+      case "pushUnsub": {
+        if (typeof b.endpoint === "string") await redis.hdel("push", subKey(b.endpoint));
+        break;
+      }
+      case "setPhone": {
+        mustLogIn();
+        if (!b.phone) { await redis.hdel("phone", me); break; }
+        const n = cleanPhone(b.phone);
+        if (!n) no("That doesn't look like a phone number. Try like 07700 900123.");
+        await redis.hset("phone", { [me]: n });
+        break;
+      }
       case "checkCode": {
         if (!isAdmin(b.code)) no("Wrong code.");
         break;
@@ -165,6 +188,10 @@ export default async function handler(req, res) {
           }
           case "removeBoy": {
             const old = boy(b.boyId);
+            await redis.hdel("phone", b.boyId);
+            const subs = (await redis.hgetall("push")) || {};
+            const hisSubs = Object.keys(subs).filter(k => subs[k].boyId === b.boyId);
+            if (hisSubs.length) await redis.hdel("push", ...hisSubs);
             if (old.username) await redis.hdel("unames", old.username);
             await redis.hdel("boys", b.boyId);
             await redis.hdel("pts", b.boyId);
@@ -210,6 +237,16 @@ export default async function handler(req, res) {
               else html = html.split(`<img src="${safe}" alt="">`).join("");
             }
             await redis.hset("posts", { [pid]: { kind, title, body: html ? "" : body, html, when, link, options, hasImg: !!img, imgs: n, at: Date.now() } });
+            // tell the boys
+            const KIND = { trip: "🚌 Trip", event: "🎉 Event", news: "📢 News", important: "⚠️ Important" }[kind];
+            const whenTxt = when ? new Date(when + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) : "";
+            const site = "https://" + (req.headers["x-forwarded-host"] || req.headers.host || "lubavitch-boys-minyan.vercel.app");
+            out.sent = { app: 0, sms: 0, smsReady: smsReady() };
+            if (b.notify !== false) out.sent.app = await pushAll({ title: `${KIND}: ${title}`, body: (whenTxt ? whenTxt + " · " : "") + (options.length > 1 ? "Vote now in the app 🗳️" : "Tap to read it"), url: "/#news", tag: pid });
+            if (b.sms !== false) {
+              const text = `Minyan Points ${KIND}: ${title}${whenTxt ? " (" + whenTxt + ")" : ""}. ${options.length > 1 ? "Vote" : "Read more"}: ${site}`.slice(0, 300);
+              out.sent.sms = await smsAll(text);
+            }
             break;
           }
           case "deletePost": {
