@@ -1,4 +1,4 @@
-import { redis, getState, isAdmin, weekKey, RULES, PARTS, WEEK_MAX, BONUS, publicState, sessionUser, newSession, hashPw, checkPw, cleanUser, USER_OK, upcomingDates, todayYmd } from "../lib/shared.js";
+import { redis, getState, isAdmin, weekKey, RULES, PARTS, WEEK_MAX, BONUS, PRIZE_AT, publicState, sessionUser, newSession, hashPw, checkPw, cleanUser, USER_OK, upcomingDates, todayYmd } from "../lib/shared.js";
 import { cleanHtml, imgSrcs, cutHtml } from "../lib/clean.js";
 import { vapid, subKey, pushAll, smsAll, cleanPhone, smsReady } from "../lib/notify.js";
 
@@ -144,12 +144,22 @@ export default async function handler(req, res) {
         if (!isAdmin(b.code)) return res.status(401).json({ error: "Wrong admin code." });
         const wk = weekKey();
         const rec = bid => s.pts[bid] || { points: 0, week: "", done: [], given: 0 };
+        // a boy just reached a gift card: tell only him
+        const prizeCheck = async (bid, before, after) => {
+          if (Math.floor(after / PRIZE_AT) <= Math.floor(before / PRIZE_AT)) return;
+          const site = "https://" + (req.headers["x-forwarded-host"] || req.headers.host || "lubavitch-boys-minyan.vercel.app");
+          try {
+            await pushAll({ title: "🎁 You won a £10 Amazon gift card!", body: `Mazel tov ${s.boys[bid].name}! You got ${after} points. Ask the admin for your gift card.`, url: "/", tag: "prize-" + bid }, bid);
+            await smsAll(`Mazel tov ${s.boys[bid].name}! You got ${after} points on Minyan Points and won a £10 Amazon gift card. Ask the admin for it. ${site}`, bid);
+          } catch (e) {}
+        };
         const give = async (bid, key) => {
           boy(bid);
           const r = rec(bid), done = r.week === wk ? (r.done || []) : [];
           if (done.includes(key)) no(`${s.boys[bid].name} already got this point for Shabbos.`);
           if (done.length >= WEEK_MAX) no(`${s.boys[bid].name} already has ${WEEK_MAX} points for Shabbos.`);
           await redis.hset("pts", { [bid]: { ...r, points: (r.points || 0) + 1, week: wk, done: [...done, key] } });
+          await prizeCheck(bid, r.points || 0, (r.points || 0) + 1);
         };
         switch (b.action) {
           case "give":
@@ -162,7 +172,7 @@ export default async function handler(req, res) {
             await redis.hset("leins", { [b.leinId]: { ...l, awarded: true } });
             break;
           }
-          case "bonus": { boy(b.boyId); const r = rec(b.boyId); await redis.hset("pts", { [b.boyId]: { ...r, points: (r.points || 0) + BONUS } }); break; }
+          case "bonus": { boy(b.boyId); const r = rec(b.boyId); await redis.hset("pts", { [b.boyId]: { ...r, points: (r.points || 0) + BONUS } }); await prizeCheck(b.boyId, r.points || 0, (r.points || 0) + BONUS); break; }
           case "minus": {
             boy(b.boyId); const r = rec(b.boyId);
             if (!r.points) no("They have 0 points.");
